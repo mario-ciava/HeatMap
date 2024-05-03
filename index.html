@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Advanced Profit/Loss Heatmap - Enhanced Edition</title>
+
+
+<link href="styles.css" rel="stylesheet"/></head>
+<body>
+<div class="theme-selector">
+<button class="theme-btn" onclick="cycleTheme()" title="Change Theme">🎨</button>
+</div>
+<div class="container">
+<div class="header">
+<h1 class="title">Profit/Loss Heatmap</h1>
+<p class="subtitle">Real-Time Thermal Market Visualization</p>
+</div>
+<div class="control-panel">
+<div class="control-panel-header">
+<h3 class="control-panel-title">Control Panel</h3>
+<div class="mode-switch" title="Real Data / Simulation">
+<label class="switch">
+<input aria-label="Real Data" id="mode-toggle" type="checkbox"/>
+<span class="slider"></span>
+</label>
+<span id="mode-toggle-label">Simulation</span>
+</div>
+<div class="live-indicator">Live</div>
+<div class="last-api" id="last-api">Last API: —</div>
+</div>
+<div class="control-panel-body">
+<!-- Search Section -->
+<div class="control-section">
+<div class="control-group">
+<label class="control-label">
+<span class="icon">🔍</span>
+                            Search Assets
+                        </label>
+<input class="search-input" id="asset-search" placeholder="Search ticker, company or sector..." type="text"/>
+</div>
+</div>
+<!-- Filters Row -->
+<div class="control-section filters-row">
+<div class="control-group">
+<label class="control-label">
+<span class="icon">📊</span>
+                            Filter
+                        </label>
+<select class="filter-select" id="filter-select">
+<option value="all">All Assets</option>
+<option value="gaining">📈 Gaining</option>
+<option value="losing">📉 Losing</option>
+<option value="neutral">➖ Neutral</option>
+</select>
+</div>
+<div class="control-group">
+<label class="control-label">
+<span class="icon">🔄</span>
+                            Sort By
+                        </label>
+<select class="filter-select" id="sort-select">
+<option value="default">Default Order</option>
+<option value="change-desc">Highest Change</option>
+<option value="change-asc">Lowest Change</option>
+<option value="price-desc">Highest Price</option>
+<option value="price-asc">Lowest Price</option>
+<option value="ticker">Alphabetical</option>
+</select>
+</div>
+<div class="control-group">
+<label class="control-label">
+<span class="icon">👁️</span>
+                            Viewing
+                        </label>
+<div class="viewing-box" id="viewing-box">
+<span class="count" id="totalAssets-inline">50</span>
+<span>/ 50</span>
+</div>
+</div>
+</div>
+<!-- Sliders Section -->
+<div class="control-section sliders">
+<div class="slider-control">
+<div class="slider-header">
+<span class="slider-label">⚡ Volatility</span>
+<span class="slider-value" id="volatility-value">1.00x</span>
+</div>
+<div class="slider-wrapper">
+<input id="volatility-slider" max="7.5" min="0" step="0.05" type="range" value="1.0"/>
+<div class="slider-range">
+<span>0.0x</span>
+<span>7.5x</span>
+</div>
+</div>
+</div>
+<div class="slider-control">
+<div class="slider-header">
+<span class="slider-label">⏱️ Update Delay</span>
+<span class="slider-value" id="speed-value">1000ms</span>
+</div>
+<div class="slider-wrapper">
+<input id="speed-slider" max="5000" min="250" step="50" type="range" value="1000"/>
+<div class="slider-range">
+<span>250ms</span>
+<span>5000ms</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Real Data: Finnhub API Key management -->
+<div class="control-section api-key-section real-only">
+<details class="api-settings">
+<summary class="control-label">
+<span class="icon">🔐</span> Finnhub API Key Settings
+                        </summary>
+<div class="control-group" style="margin-top:16px;">
+<label class="control-label">
+<span class="icon">🔑</span> Enter New API Key
+                            </label>
+<input autocomplete="off" class="search-input" id="api-key-input" placeholder="Paste your Finnhub API key here" type="password"/>
+<label class="control-label" style="margin-top: 8px;">
+<span class="icon">👁️</span> Current API Key
+                            </label>
+<div class="masked-key-wrapper">
+<input aria-label="Finnhub API Key (masked)" class="search-input" id="api-key-display" readonly="" type="text"/>
+<button class="icon-btn" id="api-key-visibility" title="Show/Hide" type="button">👁️</button>
+</div>
+<span class="control-label" style="opacity:.7; font-weight: 500;">Hover to preview • Click eye icon to toggle visibility</span>
+<button id="api-key-save" type="button">Save API Key</button>
+<span class="control-label" style="opacity:.7; font-weight: 500;">The key is stored locally in your browser (LocalStorage)</span>
+</div>
+</details>
+</div>
+</div>
+</div>
+<div class="stats-bar">
+<div class="stat">
+<span class="stat-label">Total</span>
+<span class="stat-value neutral" id="totalAssets">50</span>
+</div>
+<div class="stat">
+<span class="stat-label">Gaining</span>
+<span class="stat-value positive" id="gaining">0</span>
+</div>
+<div class="stat">
+<span class="stat-label">Losing</span>
+<span class="stat-value negative" id="losing">0</span>
+</div>
+<div class="stat">
+<span class="stat-label">Market Temp</span>
+<span class="stat-value neutral" id="marketTemp">0°C</span>
+</div>
+<div class="stat">
+<span class="stat-label">Volatility</span>
+<span class="stat-value neutral" id="volatility">0%</span>
+</div>
+<div class="stat">
+<span class="stat-label">Avg Change</span>
+<span class="stat-value neutral" id="avgChange">0%</span>
+</div>
+</div>
+<div class="heatmap-grid" id="heatmap"></div>
+</div>
+<div class="controls">
+<button class="control-btn" onclick="toggleAnimation()">Toggle Animation</button>
+<button class="control-btn" onclick="simulateMarketCrash()">Market Crash</button>
+<button class="control-btn" onclick="simulateBullRun()">Bull Run</button>
+<button class="control-btn" onclick="resetMarket()">Reset</button>
+<button class="control-btn" onclick="exportToCSV()">💾 Export</button>
+</div>
+<!-- Modal -->
+<div aria-labelledby="modal-ticker" aria-modal="true" class="modal-overlay" id="modal" role="dialog">
+<div class="modal-content">
+<button aria-label="Close" class="modal-close" onclick="closeModal()">×</button>
+<h2 class="modal-ticker" id="modal-ticker"></h2>
+<p class="modal-name" id="modal-name"></p>
+<div class="modal-details" id="modal-details"></div>
+<div class="modal-chart-container">
+<div class="modal-chart-title">Price History</div>
+<div class="modal-chart-wrapper">
+<div class="chart-y-axis" id="chart-y-axis"></div>
+<canvas class="modal-chart" id="modal-chart"></canvas>
+</div>
+<div class="chart-labels">
+<span>Start</span>
+<span id="chart-time-range">Session</span>
+<span>Now</span>
+</div>
+</div>
+</div>
+</div>
+<div aria-live="polite" class="toast" id="toast" role="status"></div>
+
+
+
+<script defer="True" src="script.js"></script></body>
+</html>
