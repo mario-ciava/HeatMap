@@ -1461,16 +1461,16 @@ body:not(.real-mode) .api-key-section {
 
 
 .last-api{
-  font-size: 0.75rem;
+  font-size: 0.85rem;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 1.2px;
-  color: #f59e0b;
-  padding: 6px 12px;
-  background: rgba(245, 158, 11, 0.08);
-  border: 1px solid rgba(245, 158, 11, 0.2);
-  border-radius: 16px;
+  letter-spacing: 0.5px;
+  color: var(--text-primary);
+  padding: 10px 16px;
+  background: rgba(31, 41, 55, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 999px;
   margin-left: auto;
+  backdrop-filter: blur(15px);
 }
 
 
@@ -1500,3 +1500,13 @@ body:not(.real-mode) .api-key-section {
 /* mostra il dot solo in real-mode */
 body:not(.real-mode) .asset-tile .status-dot{ display:none; }
 
+
+
+/* === Control Panel fade-in on toggle === */
+@keyframes cpFade {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.cp-fade-in {
+  animation: cpFade 280ms ease-out both;
+}
