@@ -4,6 +4,7 @@
     <meta charset="utf-8"/>
     <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
     <title>Advanced Profit/Loss Heatmap - Enhanced Edition</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>📊</text></svg>"/>
     <link href="styles.css" rel="stylesheet"/>
 </head>
 <body>
@@ -27,8 +28,10 @@
                     </label>
                     <span id="mode-toggle-label">Simulation</span>
                 </div>
-                <div class="live-indicator">Live</div>
-                <div class="last-api" id="last-api">Last Update (API): —</div>
+                <div class="status-indicator" id="status-indicator">
+                    <span class="status-dot"></span>
+                    <span class="status-text">Live</span>
+                </div>
             </div>
             
             <div class="control-panel-body">
@@ -37,7 +40,7 @@
                     <div class="control-group">
                         <label class="control-label">
                             <span class="icon">🔍</span>
-                            Search Assets
+                            Search
                         </label>
                         <input class="search-input" id="asset-search" placeholder="Search ticker, company or sector..." type="text"/>
                     </div>
@@ -77,7 +80,7 @@
                 <div class="control-section sliders">
                     <div class="slider-control">
                         <div class="slider-header">
-                            <span class="slider-label">⚡ Volatility</span>
+                            <span class="slider-label">Volatility</span>
                             <span class="slider-value" id="volatility-value">1.00x</span>
                         </div>
                         <div class="slider-wrapper">
@@ -91,7 +94,7 @@
                     
                     <div class="slider-control">
                         <div class="slider-header">
-                            <span class="slider-label">⏱️ Update Delay</span>
+                            <span class="slider-label">Update Delay</span>
                             <span class="slider-value" id="speed-value">1000ms</span>
                         </div>
                         <div class="slider-wrapper">
@@ -110,23 +113,34 @@
                         <summary class="control-label">
                             <span class="icon">🔐</span> Finnhub API Key Settings
                         </summary>
-                        <div class="control-group" style="margin-top:16px;">
-                            <label class="control-label">
-                                <span class="icon">🔑</span> Enter New API Key
-                            </label>
-                            <input autocomplete="off" class="search-input" id="api-key-input" placeholder="Paste your Finnhub API key here" type="password"/>
-                            
-                            <label class="control-label" style="margin-top: 8px;">
-                                <span class="icon">👁️</span> Current API Key
-                            </label>
-                            <div class="masked-key-wrapper">
-                                <input aria-label="Finnhub API Key (masked)" class="search-input" id="api-key-display" readonly="" type="text"/>
-                                <button class="icon-btn" id="api-key-visibility" title="Show/Hide" type="button">👁️</button>
+                        <div class="api-settings-content">
+                            <!-- Row 1: New API Key Input + Save Button -->
+                            <div class="api-row">
+                                <div class="api-field-group">
+                                    <label class="api-label">New API Key</label>
+                                    <div class="api-input-with-button">
+                                        <input autocomplete="off" class="api-input" id="api-key-input" placeholder="Paste your Finnhub API key" type="password"/>
+                                        <button id="api-key-save" type="button">Save</button>
+                                    </div>
+                                </div>
                             </div>
-                            <span class="control-label" style="opacity:.7; font-weight: 500;">Hover to preview • Click eye icon to toggle visibility</span>
-                            
-                            <button id="api-key-save" type="button">Save API Key</button>
-                            <span class="control-label" style="opacity:.7; font-weight: 500;">The key is stored locally in your browser (LocalStorage)</span>
+
+                            <!-- Row 2: Current API Key (masked) -->
+                            <div class="api-row">
+                                <div class="api-field-group">
+                                    <label class="api-label">Current API Key</label>
+                                    <div class="masked-key-wrapper">
+                                        <input aria-label="Finnhub API Key (masked)" class="api-input" id="api-key-display" readonly="" type="text"/>
+                                        <button class="icon-btn" id="api-key-visibility" title="Show/Hide" type="button">👁️</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Info Text -->
+                            <div class="api-info">
+                                <p>Your API key is stored locally in your browser (LocalStorage)</p>
+                                <p>Get your free API key at <a href="https://finnhub.io" target="_blank" rel="noopener">finnhub.io</a></p>
+                            </div>
                         </div>
                     </details>
                 </div>
@@ -168,7 +182,7 @@
         <button class="control-btn" id="btn-market-crash">Market Crash</button>
         <button class="control-btn" id="btn-bull-run">Bull Run</button>
         <button class="control-btn" id="btn-reset">Reset</button>
-        <button class="control-btn" id="btn-export">💾 Export</button>
+        <button class="control-btn" id="btn-export">Export</button>
     </div>
     
     <!-- Modal -->

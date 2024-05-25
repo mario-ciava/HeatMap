@@ -111,16 +111,34 @@ function initHeatmap() {
     `;
 
     tile.insertBefore(canvas, tile.firstChild);
-    
+
     // Add click handler for modal
     tile.addEventListener('click', () => showAssetDetails(index));
-    
+
     heatmapContainer.appendChild(tile);
   });
+
+  // Create add tile button
+  const addTile = document.createElement('div');
+  addTile.className = 'asset-tile add-tile';
+  addTile.style.animationDelay = `${assets.length * 0.03}s`;
+  addTile.innerHTML = `
+    <div class="add-tile-icon">+</div>
+    <div class="add-tile-label">Add Ticker</div>
+  `;
+  addTile.addEventListener('click', () => {
+    showToast('Add ticker feature coming soon');
+  });
+  heatmapContainer.appendChild(addTile);
 
   // Initialize app controller
   app = new AppController(assets);
   app.init();
+
+  // Listen for tile updates to refresh statistics
+  app.state.on('tile:updated', () => {
+    updateStats();
+  });
 
   // Setup remaining UI features
   setupFiltersAndSearch();
@@ -129,8 +147,11 @@ function initHeatmap() {
   setupKeyboardShortcuts();
   setupButtons();
 
-  log.info('✅ Heatmap initialized');
-  showToast('🚀 Heatmap loaded');
+  // Initial stats update
+  updateStats();
+
+  log.info('Heatmap initialized successfully');
+  showToast('Heatmap loaded');
 }
 
 // ============================================================================
@@ -160,13 +181,17 @@ function applyFilters() {
   const filter = document.getElementById('filter-select')?.value || 'all';
   const sort = document.getElementById('sort-select')?.value || 'default';
 
-  const tiles = Array.from(document.querySelectorAll('.asset-tile'));
+  const tiles = Array.from(document.querySelectorAll('.asset-tile:not(.add-tile)'));
 
   tiles.forEach(tile => {
     const index = parseInt(tile.dataset.index);
+    if (isNaN(index)) return; // Skip tiles without valid index
+
     const asset = assets[index];
+    if (!asset) return; // Skip if asset not found
+
     const tileState = app.state.getTile(asset.ticker);
-    
+
     let show = true;
 
     // Search filter
@@ -187,7 +212,7 @@ function applyFilters() {
           show = change < CONFIG.UI.THRESHOLDS.MILD_LOSS;
           break;
         case 'neutral':
-          show = change >= CONFIG.UI.THRESHOLDS.MILD_LOSS && 
+          show = change >= CONFIG.UI.THRESHOLDS.MILD_LOSS &&
                  change <= CONFIG.UI.THRESHOLDS.MILD_GAIN;
           break;
       }
@@ -198,20 +223,32 @@ function applyFilters() {
 
   // Apply sorting
   applySorting(sort);
-  
+
   // Update stats
   updateStats();
 }
 
 function applySorting(sortType) {
   const container = document.getElementById('heatmap');
-  const tiles = Array.from(container.children);
+  const allTiles = Array.from(container.children);
+
+  // Separate add-tile from regular tiles
+  const addTile = allTiles.find(t => t.classList.contains('add-tile'));
+  const tiles = allTiles.filter(t => !t.classList.contains('add-tile'));
 
   tiles.sort((a, b) => {
     const indexA = parseInt(a.dataset.index);
     const indexB = parseInt(b.dataset.index);
+
+    // Handle invalid indices
+    if (isNaN(indexA) || isNaN(indexB)) return 0;
+
     const assetA = assets[indexA];
     const assetB = assets[indexB];
+
+    // Handle missing assets
+    if (!assetA || !assetB) return 0;
+
     const tileA = app.state.getTile(assetA.ticker);
     const tileB = app.state.getTile(assetB.ticker);
 
@@ -231,25 +268,37 @@ function applySorting(sortType) {
     }
   });
 
+  // Re-append tiles in sorted order
   tiles.forEach(tile => container.appendChild(tile));
+
+  // Always append add-tile at the end
+  if (addTile) {
+    container.appendChild(addTile);
+  }
 }
 
 function updateStats() {
-  const tiles = document.querySelectorAll('.asset-tile:not(.hidden)');
+  const tiles = document.querySelectorAll('.asset-tile:not(.hidden):not(.add-tile)');
   let gaining = 0;
   let losing = 0;
   let totalChange = 0;
+  const changes = [];
 
   tiles.forEach(tile => {
     const index = parseInt(tile.dataset.index);
+    if (isNaN(index)) return; // Skip tiles without valid index
+
     const asset = assets[index];
+    if (!asset) return; // Skip if asset not found
+
     const tileState = app.state.getTile(asset.ticker);
     const change = tileState?.change || 0;
 
     if (change > CONFIG.UI.THRESHOLDS.MILD_GAIN) gaining++;
     else if (change < CONFIG.UI.THRESHOLDS.MILD_LOSS) losing++;
-    
+
     totalChange += change;
+    changes.push(Math.abs(change));
   });
 
   const count = tiles.length || 1;
@@ -263,12 +312,14 @@ function updateStats() {
   tempEl.textContent = `${marketTemp}°C`;
   tempEl.className = `stat-value ${marketTemp > 10 ? 'positive' : marketTemp < -10 ? 'negative' : 'neutral'}`;
 
-  const volatility = Math.abs(totalChange / count * 10).toFixed(1);
+  // Volatility: average of absolute changes (represents actual market movement)
+  const volatility = (changes.reduce((sum, val) => sum + val, 0) / count).toFixed(2);
   document.getElementById('volatility').textContent = `${volatility}%`;
 
+  // Average Change: net average (can be positive or negative)
   const avgChange = (totalChange / count).toFixed(2);
   const avgEl = document.getElementById('avgChange');
-  avgEl.textContent = `${avgChange}%`;
+  avgEl.textContent = `${avgChange > 0 ? '+' : ''}${avgChange}%`;
   avgEl.className = `stat-value ${avgChange > 0 ? 'positive' : avgChange < 0 ? 'negative' : 'neutral'}`;
 }
 
@@ -278,15 +329,25 @@ function setupSliders() {
   const volatilityValue = document.getElementById('volatility-value');
 
   if (volatilitySlider && volatilityValue) {
+    const updateVolatilitySlider = (slider) => {
+      const value = parseFloat(slider.value);
+      const min = parseFloat(slider.min);
+      const max = parseFloat(slider.max);
+      const progress = ((value - min) / (max - min)) * 100;
+      slider.style.setProperty('--slider-progress', `${progress}%`);
+    };
+
+    // Initialize on load
+    updateVolatilitySlider(volatilitySlider);
+
     volatilitySlider.addEventListener('input', (e) => {
       const value = parseFloat(e.target.value);
       CONFIG.UI.VOLATILITY.USER_MULTIPLIER = value;
       volatilityValue.textContent = `${value.toFixed(2)}x`;
 
-      const progress = ((value - 0) / (7.5 - 0)) * 100;
-      e.target.style.setProperty('--slider-progress', `${progress}%`);
+      updateVolatilitySlider(e.target);
 
-      showToast(`⚡ Volatility set to ${value.toFixed(2)}x`);
+      showToast(`Volatility: ${value.toFixed(2)}x`);
     });
   }
 
@@ -295,15 +356,25 @@ function setupSliders() {
   const speedValue = document.getElementById('speed-value');
 
   if (speedSlider && speedValue) {
+    const updateSpeedSlider = (slider) => {
+      const value = parseInt(slider.value);
+      const min = parseInt(slider.min);
+      const max = parseInt(slider.max);
+      const progress = ((value - min) / (max - min)) * 100;
+      slider.style.setProperty('--slider-progress', `${progress}%`);
+    };
+
+    // Initialize on load
+    updateSpeedSlider(speedSlider);
+
     speedSlider.addEventListener('input', (e) => {
       const value = parseInt(e.target.value);
       CONFIG.UI.UPDATE_FREQUENCY = value;
       speedValue.textContent = `${value}ms`;
 
-      const progress = ((value - 250) / (5000 - 250)) * 100;
-      e.target.style.setProperty('--slider-progress', `${progress}%`);
+      updateSpeedSlider(e.target);
 
-      showToast(`⏱️ Update delay set to ${value}ms`);
+      showToast(`Update delay: ${value}ms`);
     });
   }
 }
@@ -372,35 +443,55 @@ function showAssetDetails(index) {
   const asset = assets[index];
   const tileState = app.state.getTile(asset.ticker);
   const history = app.priceHistory.get(asset.ticker) || [];
+  const mode = app.state.getMode();
 
   document.getElementById('modal-ticker').textContent = asset.ticker;
   document.getElementById('modal-name').textContent = asset.name;
 
-  const firstPrice = history[0] || asset.basePrice;
-  const sessionChange = tileState ? ((tileState.price - firstPrice) / firstPrice * 100).toFixed(2) : '0.00';
+  // Handle cases where price might be null (in real mode without data)
+  const currentPrice = tileState?.price;
+  const currentChange = tileState?.change;
 
-  document.getElementById('modal-details').innerHTML = `
+  // Build details HTML
+  let detailsHTML = `
     <div class="detail-row">
       <span class="detail-label">Current Price</span>
-      <span class="detail-value">$${tileState?.price?.toFixed(2) || '0.00'}</span>
+      <span class="detail-value">${currentPrice != null ? `$${currentPrice.toFixed(2)}` : '---'}</span>
     </div>
     <div class="detail-row">
       <span class="detail-label">Change</span>
-      <span class="detail-value" style="color: ${tileState?.change > 0 ? '#10b981' : tileState?.change < 0 ? '#ef4444' : '#8b92a4'}">
-        ${tileState?.change > 0 ? '+' : ''}${tileState?.change?.toFixed(2) || '0.00'}%
+      <span class="detail-value" style="color: ${currentChange > 0 ? '#10b981' : currentChange < 0 ? '#ef4444' : '#8b92a4'}">
+        ${currentChange != null ? `${currentChange > 0 ? '+' : ''}${currentChange.toFixed(2)}%` : '---'}
       </span>
     </div>
-    <div class="detail-row">
-      <span class="detail-label">Session Total</span>
-      <span class="detail-value" style="color: ${sessionChange > 0 ? '#10b981' : sessionChange < 0 ? '#ef4444' : '#8b92a4'}">
-        ${sessionChange > 0 ? '+' : ''}${sessionChange}%
-      </span>
-    </div>
+  `;
+
+  // Only show "Session Total" in simulation mode
+  if (mode === 'simulation') {
+    const firstPrice = history[0] || asset.basePrice;
+    let sessionChange = '0.00';
+    if (currentPrice != null && firstPrice != null) {
+      sessionChange = ((currentPrice - firstPrice) / firstPrice * 100).toFixed(2);
+    }
+
+    detailsHTML += `
+      <div class="detail-row">
+        <span class="detail-label">Session Total</span>
+        <span class="detail-value" style="color: ${sessionChange > 0 ? '#10b981' : sessionChange < 0 ? '#ef4444' : '#8b92a4'}">
+          ${sessionChange !== '0.00' ? `${sessionChange > 0 ? '+' : ''}${sessionChange}%` : '---'}
+        </span>
+      </div>
+    `;
+  }
+
+  detailsHTML += `
     <div class="detail-row">
       <span class="detail-label">Sector</span>
       <span class="detail-value">${asset.sector}</span>
     </div>
   `;
+
+  document.getElementById('modal-details').innerHTML = detailsHTML;
 
   const modal = document.getElementById('modal');
   modal.classList.add('active');
@@ -508,12 +599,16 @@ function simulateMarketCrash() {
   assets.forEach(asset => {
     const tile = app.state.getTile(asset.ticker);
     if (tile) {
+      // Ensure we have a base price (use placeholder for simulation)
+      const basePrice = tile.basePrice || tile._placeholderBasePrice;
+      tile.basePrice = basePrice;
+
       tile.change = -5 - Math.random() * 5;
-      tile.price = tile.basePrice * (1 + tile.change / 100);
+      tile.price = basePrice * (1 + tile.change / 100);
       app.paintTile(asset.ticker);
     }
   });
-  showToast('📉 Market crash simulated!');
+  showToast('Market crash simulated');
   updateStats();
 }
 
@@ -521,12 +616,16 @@ function simulateBullRun() {
   assets.forEach(asset => {
     const tile = app.state.getTile(asset.ticker);
     if (tile) {
+      // Ensure we have a base price (use placeholder for simulation)
+      const basePrice = tile.basePrice || tile._placeholderBasePrice;
+      tile.basePrice = basePrice;
+
       tile.change = 5 + Math.random() * 5;
-      tile.price = tile.basePrice * (1 + tile.change / 100);
+      tile.price = basePrice * (1 + tile.change / 100);
       app.paintTile(asset.ticker);
     }
   });
-  showToast('📈 Bull run simulated!');
+  showToast('Bull run simulated');
   updateStats();
 }
 
@@ -534,12 +633,16 @@ function resetMarket() {
   assets.forEach(asset => {
     const tile = app.state.getTile(asset.ticker);
     if (tile) {
+      // Ensure we have a base price (use placeholder for simulation)
+      const basePrice = tile.basePrice || tile._placeholderBasePrice;
+      tile.basePrice = basePrice;
+
       tile.change = 0;
-      tile.price = tile.basePrice;
+      tile.price = basePrice;
       app.paintTile(asset.ticker);
     }
   });
-  showToast('🔄 Market reset');
+  showToast('Market reset');
   updateStats();
 }
 
@@ -558,11 +661,40 @@ function exportToCSV() {
   a.download = `heatmap-${new Date().toISOString().slice(0, 10)}.csv`;
   a.click();
   URL.revokeObjectURL(url);
-  showToast('💾 Data exported');
+  showToast('Data exported successfully');
 }
 
+// Theme cycling
+const THEMES = ['thermal', 'matrix', 'ocean', 'sunset', 'monochrome'];
+const THEME_NAMES = {
+  thermal: 'Thermal',
+  matrix: 'Matrix',
+  ocean: 'Ocean',
+  sunset: 'Sunset',
+  monochrome: 'Monochrome'
+};
+
+let currentTheme = localStorage.getItem('heatmap-theme') || 'thermal';
+
+// Apply saved theme on load
+document.body.setAttribute('data-theme', currentTheme);
+
 function cycleTheme() {
-  showToast('🎨 Theme cycling not yet integrated');
+  const currentIndex = THEMES.indexOf(currentTheme);
+  const nextIndex = (currentIndex + 1) % THEMES.length;
+  currentTheme = THEMES[nextIndex];
+
+  // Apply theme
+  document.body.setAttribute('data-theme', currentTheme);
+
+  // Save preference
+  try {
+    localStorage.setItem('heatmap-theme', currentTheme);
+  } catch (e) {
+    log.warn('Failed to save theme preference');
+  }
+
+  showToast(`Theme: ${THEME_NAMES[currentTheme]}`);
 }
 
 // ============================================================================

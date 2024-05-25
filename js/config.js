@@ -45,9 +45,14 @@ export const CONFIG = {
     }
   },
   
+  // === API Key Settings ===
+  API_KEY: {
+    DEFAULT: 'd3n3tqpr01qmso3665q0d3n3tqpr01qmso3665qg',  // Fallback API key from config
+    STORAGE_KEY: 'finnhub_api_key'                      // localStorage key name
+  },
+
   // === Storage Keys ===
   STORAGE: {
-    API_KEY: 'd3n3tqpr01qmso3665q0d3n3tqpr01qmso3665qg',
     THEME: 'heatmap_theme',
     STATE: 'heatmap-state'
   },

@@ -42,11 +42,15 @@ export class FinnhubTransport extends EventEmitter {
     this.isRunning = false;
     this.strategy = Strategy.WS_PREFERRED;
     this.subscribedTickers = new Set();
-    
+
     // REST fallback scheduler (if WS fails)
     this.restFallbackInterval = null;
     this.restFallbackIntervalMs = 30000; // 30 seconds
-    
+
+    // Sequential fetching state
+    this.sequentialFetchInProgress = false;
+    this.sequentialFetchQueue = [];
+
     // Wire up event handlers
     this._setupEventHandlers();
   }
@@ -95,13 +99,19 @@ export class FinnhubTransport extends EventEmitter {
       return;
     }
 
-    log.info('🚀 Starting transport services...');
+    log.info('Starting transport services...');
     this.isRunning = true;
 
     // Store tickers for subscription
     this.subscribedTickers = new Set(tickers);
 
-    // Start WebSocket (primary data source)
+    // Start sequential initial fetch (REST) to populate data
+    // Priority: tickers without data first
+    if (this.rest.isAvailable() && this.strategy !== Strategy.REST_ONLY) {
+      this._startSequentialFetch(Array.from(this.subscribedTickers));
+    }
+
+    // Start WebSocket (primary data source) - will run alongside REST fetch
     if (this.strategy !== Strategy.REST_ONLY) {
       this._startWebSocket();
     }
@@ -123,7 +133,7 @@ export class FinnhubTransport extends EventEmitter {
       return;
     }
 
-    log.info('🛑 Stopping transport services...');
+    log.info('Stopping transport services...');
     this.isRunning = false;
 
     // Stop WebSocket
@@ -134,6 +144,10 @@ export class FinnhubTransport extends EventEmitter {
 
     // Stop REST fallback
     this._stopRestFallback();
+
+    // Stop sequential fetch
+    this.sequentialFetchInProgress = false;
+    this.sequentialFetchQueue = [];
 
     // Abort any in-flight REST requests
     this.rest.abortAll();
@@ -288,7 +302,7 @@ export class FinnhubTransport extends EventEmitter {
       return;
     }
 
-    log.warn('⚠️ Starting REST fallback polling (WebSocket unavailable)');
+    log.warn('Starting REST fallback polling (WebSocket unavailable)');
 
     const poll = async () => {
       if (!this.isRunning) return;
@@ -327,6 +341,89 @@ export class FinnhubTransport extends EventEmitter {
   }
 
   /**
+   * Start sequential REST fetch for initial data population
+   * Prioritizes tickers without existing data
+   * @private
+   */
+  _startSequentialFetch(tickers) {
+    if (this.sequentialFetchInProgress) {
+      log.warn('Sequential fetch already in progress');
+      return;
+    }
+
+    // Sort tickers by priority: those without data first
+    const sortedTickers = tickers.sort((a, b) => {
+      const tileA = this.stateManager.getTile(a);
+      const tileB = this.stateManager.getTile(b);
+
+      // Priority 1: Tickers without any data
+      const hasDataA = tileA && tileA.hasInfo;
+      const hasDataB = tileB && tileB.hasInfo;
+
+      if (!hasDataA && hasDataB) return -1; // A before B
+      if (hasDataA && !hasDataB) return 1;  // B before A
+
+      // Priority 2: Alphabetical
+      return a.localeCompare(b);
+    });
+
+    this.sequentialFetchQueue = [...sortedTickers];
+    this.sequentialFetchInProgress = true;
+
+    log.info(`Starting sequential fetch for ${sortedTickers.length} tickers (prioritized)`);
+
+    // Start processing queue
+    this._processSequentialFetchQueue();
+  }
+
+  /**
+   * Process sequential fetch queue
+   * @private
+   */
+  async _processSequentialFetchQueue() {
+    // Stop if no longer running or queue is empty
+    if (!this.isRunning || this.sequentialFetchQueue.length === 0) {
+      this.sequentialFetchInProgress = false;
+      if (this.sequentialFetchQueue.length === 0) {
+        log.info('Sequential fetch completed');
+      }
+      return;
+    }
+
+    const ticker = this.sequentialFetchQueue.shift();
+
+    // Skip if we already have data for this ticker (might have come from WebSocket)
+    const tile = this.stateManager.getTile(ticker);
+    if (tile && tile.hasInfo) {
+      log.debug(`Skipping ${ticker} - already has data`);
+      // Continue with next ticker immediately
+      this._processSequentialFetchQueue();
+      return;
+    }
+
+    log.debug(`Fetching quote for ${ticker}...`);
+
+    try {
+      const quote = await this.rest.fetchQuote(ticker);
+
+      if (quote) {
+        this._handleQuote(quote, 'rest-sequential');
+      } else {
+        log.warn(`No quote data received for ${ticker}`);
+      }
+    } catch (error) {
+      log.error(`Failed to fetch ${ticker}:`, error.message);
+    }
+
+    // Delay before next request to respect rate limits
+    // 60 requests/min = 1 request per second
+    const delayMs = 1100; // 1.1 seconds to be safe
+    setTimeout(() => {
+      this._processSequentialFetchQueue();
+    }, delayMs);
+  }
+
+  /**
    * Setup event handlers for child services
    * @private
    */
@@ -334,7 +431,7 @@ export class FinnhubTransport extends EventEmitter {
     // === WebSocket Events ===
     
     this.ws.on('connected', () => {
-      log.info('✅ WebSocket connected');
+      log.info('WebSocket connected');
       this.emit('ws:connected', {});
       
       // Stop REST fallback if it was running
@@ -342,7 +439,7 @@ export class FinnhubTransport extends EventEmitter {
     });
 
     this.ws.on('disconnected', (data) => {
-      log.warn('❌ WebSocket disconnected:', data.reason);
+      log.warn('WebSocket disconnected:', data.reason);
       this.emit('ws:disconnected', data);
       
       // Start REST fallback if WS stays down
@@ -363,10 +460,15 @@ export class FinnhubTransport extends EventEmitter {
     });
 
     // === REST Events ===
-    
+
     this.rest.on('rate_limited', (data) => {
       log.warn(`REST rate limited: backoff until ${new Date(data.backoffUntil).toISOString()}`);
       this.emit('rest:rate_limited', data);
+    });
+
+    this.rest.on('error', (error) => {
+      log.error('REST error:', error.message);
+      this.emit('error', { source: 'rest', ...error });
     });
 
     // === Market Status Events ===

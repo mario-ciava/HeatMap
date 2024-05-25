@@ -1,6 +1,6 @@
 /**
- * Logger - Configurable logging utility
- * Supports log levels and formatted output
+ * Logger - Production-ready logging utility
+ * Clean, minimal, configurable
  */
 
 const LOG_LEVELS = {
@@ -11,29 +11,48 @@ const LOG_LEVELS = {
   none: 4
 };
 
+const LEVEL_COLORS = {
+  debug: '#6b7280',
+  info: '#3b82f6',
+  warn: '#f59e0b',
+  error: '#ef4444'
+};
+
 class Logger {
   constructor(config = {}) {
-    this.level = LOG_LEVELS[config.level || 'info'];
+    this.level = LOG_LEVELS[config.level || 'warn'];
     this.prefix = config.prefix || '';
+    this.enableTimestamp = config.enableTimestamp !== false;
+    this.enableColors = config.enableColors !== false;
   }
 
-  /**
-   * Set log level
-   * @param {'debug' | 'info' | 'warn' | 'error' | 'none'} level
-   */
   setLevel(level) {
     if (level in LOG_LEVELS) {
       this.level = LOG_LEVELS[level];
     }
   }
 
-  /**
-   * Format message with timestamp and prefix
-   */
   _format(level, args) {
-    const timestamp = new Date().toISOString().split('T')[1].slice(0, -1);
-    const prefix = this.prefix ? `[${this.prefix}]` : '';
-    return [`[${timestamp}]${prefix}[${level.toUpperCase()}]`, ...args];
+    const parts = [];
+
+    if (this.enableTimestamp) {
+      const now = new Date();
+      const time = now.toTimeString().split(' ')[0];
+      parts.push(time);
+    }
+
+    if (this.prefix) {
+      parts.push(this.prefix);
+    }
+
+    const prefix = parts.length > 0 ? `[${parts.join(' ')}]` : '';
+
+    if (this.enableColors && typeof window !== 'undefined') {
+      const color = LEVEL_COLORS[level];
+      return [`%c${prefix}`, `color: ${color}; font-weight: bold`, ...args];
+    }
+
+    return [prefix, ...args];
   }
 
   debug(...args) {
@@ -60,21 +79,21 @@ class Logger {
     }
   }
 
-  /**
-   * Create a child logger with additional prefix
-   * @param {string} childPrefix
-   * @returns {Logger}
-   */
   child(childPrefix) {
     return new Logger({
       level: Object.keys(LOG_LEVELS).find(k => LOG_LEVELS[k] === this.level),
-      prefix: this.prefix ? `${this.prefix}:${childPrefix}` : childPrefix
+      prefix: this.prefix ? `${this.prefix}:${childPrefix}` : childPrefix,
+      enableTimestamp: this.enableTimestamp,
+      enableColors: this.enableColors
     });
   }
 }
 
-// Export singleton with default config
-export const logger = new Logger({ level: 'info' });
+// Export singleton - default to warn level in production
+export const logger = new Logger({
+  level: 'warn',
+  enableTimestamp: true,
+  enableColors: true
+});
 
-// Export class for creating custom loggers
 export { Logger };

@@ -37,7 +37,7 @@ export class RESTClient extends EventEmitter {
     this.isHttpOrigin = /^https?:$/i.test(location.protocol);
     
     if (!this.isHttpOrigin) {
-      log.warn('⚠️ Running from file:// - REST endpoints disabled to avoid CORS');
+      log.warn('Running from file:// - REST endpoints disabled to avoid CORS');
     }
   }
 
@@ -75,22 +75,44 @@ export class RESTClient extends EventEmitter {
     }
 
     const endpoint = `/quote?symbol=${encodeURIComponent(ticker)}`;
-    
+
     try {
       const data = await this._request(endpoint, signal);
-      
+
       if (!data || typeof data.c !== 'number') {
         return null;
       }
 
+      // Calculate change percent with fallback chain
+      let changePercent = data.dp;
+      let basePrice = data.pc;
+
+      if (changePercent == null) {
+        // Try previousClose first
+        if (data.pc != null && data.pc > 0) {
+          changePercent = ((data.c - data.pc) / data.pc) * 100;
+          basePrice = data.pc;
+        }
+        // Fallback to open price
+        else if (data.o != null && data.o > 0) {
+          changePercent = ((data.c - data.o) / data.o) * 100;
+          basePrice = data.o;
+        }
+        // Final fallback: 0%
+        else {
+          changePercent = 0;
+          basePrice = data.c;
+        }
+      }
+
       return {
         ticker,
-        price: data.c,          // Current price
-        previousClose: data.pc, // Previous close
-        changePercent: data.dp, // Percent change
-        high: data.h,           // Day high
-        low: data.l,            // Day low
-        open: data.o,           // Day open
+        price: data.c,
+        previousClose: basePrice,
+        changePercent,
+        high: data.h,
+        low: data.l,
+        open: data.o,
         timestamp: Date.now()
       };
 
@@ -223,6 +245,14 @@ export class RESTClient extends EventEmitter {
         throw new Error('Rate limited (429)');
       }
 
+      // Handle authentication errors
+      if (response.status === 401 || response.status === 403) {
+        const error = new Error(`Authentication failed (${response.status})`);
+        error.code = 'AUTH_FAILED';
+        this.emit('error', error);
+        throw error;
+      }
+
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
@@ -293,7 +323,7 @@ export class RESTClient extends EventEmitter {
 
     this.backoffUntil = Date.now() + this.backoffDelay;
 
-    log.warn(`⚠️ HTTP 429 Rate Limited - backing off for ${this.backoffDelay / 1000}s`);
+    log.warn(`HTTP 429 Rate Limited - backing off for ${this.backoffDelay / 1000}s`);
     
     this.emit('rate_limited', { 
       backoffUntil: this.backoffUntil,
@@ -306,7 +336,7 @@ export class RESTClient extends EventEmitter {
    */
   resetBackoff() {
     if (this.backoffUntil > 0 && Date.now() > this.backoffUntil) {
-      log.info('✅ Backoff period ended, resuming normal operation');
+      log.info('Backoff period ended, resuming normal operation');
       this.backoffUntil = 0;
       this.backoffDelay = 0;
     }

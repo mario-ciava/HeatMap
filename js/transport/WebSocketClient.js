@@ -106,7 +106,7 @@ export class WebSocketClient extends EventEmitter {
    * @private
    */
   _onOpen() {
-    log.info('✅ WebSocket connected');
+    log.info('WebSocket connected');
     this._setState(States.CONNECTED);
     this.reconnectAttempts = 0;
     this.lastPongTime = Date.now();
@@ -247,7 +247,7 @@ export class WebSocketClient extends EventEmitter {
    */
   _sendSubscribe(symbol) {
     this._send({ type: 'subscribe', symbol });
-    log.debug(`📈 Subscribed to ${symbol}`);
+    log.debug(`Subscribed to ${symbol}`);
   }
 
   /**
@@ -256,7 +256,7 @@ export class WebSocketClient extends EventEmitter {
    */
   _sendUnsubscribe(symbol) {
     this._send({ type: 'unsubscribe', symbol });
-    log.debug(`📉 Unsubscribed from ${symbol}`);
+    log.debug(`Unsubscribed from ${symbol}`);
   }
 
   /**

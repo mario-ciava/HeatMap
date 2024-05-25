@@ -41,9 +41,13 @@ export class StateManager extends EventEmitter {
         ticker: asset.ticker,
         name: asset.name,
         sector: asset.sector,
-        price: asset.price,
-        basePrice: asset.basePrice,
-        change: asset.change || 0,
+        // Store placeholder values for simulation mode reference
+        _placeholderPrice: asset.price,
+        _placeholderBasePrice: asset.basePrice,
+        // Actual values start as null/undefined in real mode
+        price: null,
+        basePrice: null,
+        change: null,
         hasInfo: false, // Start with NO INFO
         lastTradeTs: 0
       });
@@ -107,19 +111,22 @@ export class StateManager extends EventEmitter {
     const oldPrice = tile.price;
     const newPrice = quoteData.price;
 
-    // Update base price if provided, otherwise keep existing
-    if (quoteData.previousClose != null) {
+    // Update base price if provided
+    if (quoteData.previousClose != null && quoteData.previousClose > 0) {
       tile.basePrice = quoteData.previousClose;
     }
 
     // Update price
     tile.price = newPrice;
 
-    // Calculate or use provided change percentage
+    // Update change percentage
     if (quoteData.changePercent != null) {
       tile.change = quoteData.changePercent;
-    } else if (tile.basePrice > 0) {
+    } else if (tile.basePrice != null && tile.basePrice > 0) {
+      // Calculate from basePrice if not provided
       tile.change = ((newPrice - tile.basePrice) / tile.basePrice) * 100;
+    } else {
+      tile.change = null;
     }
 
     // Mark as having info now
@@ -151,11 +158,46 @@ export class StateManager extends EventEmitter {
 
   /**
    * Reset all tiles to NO INFO state
+   * In real mode: clears all data (null) - but preserves cached real data
+   * In simulation mode: restores placeholder values
+   * @param {boolean} preserveRealData - If true, keeps previously fetched real data
    */
-  resetAllTiles() {
+  resetAllTiles(preserveRealData = false) {
+    const isSimulation = this.state.mode === 'simulation';
+
     this.state.tiles.forEach((tile, ticker) => {
-      tile.hasInfo = false;
-      tile.lastTradeTs = 0;
+      if (isSimulation) {
+        // Save current real data if it exists
+        if (tile.hasInfo && tile.price != null) {
+          tile._savedRealPrice = tile.price;
+          tile._savedRealBasePrice = tile.basePrice;
+          tile._savedRealChange = tile.change;
+          tile._savedRealTradeTs = tile.lastTradeTs;
+        }
+
+        // Restore placeholder values for simulation
+        tile.price = tile._placeholderPrice;
+        tile.basePrice = tile._placeholderBasePrice;
+        tile.change = 0;
+        tile.hasInfo = false;
+        tile.lastTradeTs = 0;
+      } else {
+        // Real mode: restore previously saved data if available and requested
+        if (preserveRealData && tile._savedRealPrice != null) {
+          tile.price = tile._savedRealPrice;
+          tile.basePrice = tile._savedRealBasePrice;
+          tile.change = tile._savedRealChange;
+          tile.lastTradeTs = tile._savedRealTradeTs;
+          tile.hasInfo = true;
+        } else {
+          // Clear data for real mode (waiting for API)
+          tile.price = null;
+          tile.basePrice = null;
+          tile.change = null;
+          tile.hasInfo = false;
+          tile.lastTradeTs = 0;
+        }
+      }
     });
 
     this.emit('tiles:reset', {});
