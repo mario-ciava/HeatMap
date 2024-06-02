@@ -48,6 +48,11 @@ export class StateManager extends EventEmitter {
         price: null,
         basePrice: null,
         change: null,
+        previousClose: null,
+        open: null,
+        high: null,
+        low: null,
+        volume: null,
         hasInfo: false, // Start with NO INFO
         lastTradeTs: 0
       });
@@ -114,10 +119,35 @@ export class StateManager extends EventEmitter {
     // Update base price if provided
     if (quoteData.previousClose != null && quoteData.previousClose > 0) {
       tile.basePrice = quoteData.previousClose;
+      tile.previousClose = quoteData.previousClose;
+    }
+
+    if (quoteData.open != null && quoteData.open > 0) {
+      tile.open = quoteData.open;
+    }
+
+    if (quoteData.high != null && quoteData.high > 0) {
+      tile.high = quoteData.high;
+    }
+
+    if (quoteData.low != null && quoteData.low > 0) {
+      tile.low = quoteData.low;
     }
 
     // Update price
     tile.price = newPrice;
+
+    if (tile.open == null) {
+      tile.open = newPrice;
+    }
+
+    if (tile.high == null || newPrice > tile.high) {
+      tile.high = newPrice;
+    }
+
+    if (tile.low == null || newPrice < tile.low) {
+      tile.low = newPrice;
+    }
 
     // Update change percentage
     if (quoteData.changePercent != null) {
@@ -132,6 +162,10 @@ export class StateManager extends EventEmitter {
     // Mark as having info now
     tile.hasInfo = true;
     tile.lastTradeTs = quoteData.timestamp || Date.now();
+
+    if (quoteData.volume != null) {
+      tile.volume = (tile.volume || 0) + quoteData.volume;
+    }
 
     // Emit change event
     this.emit('tile:updated', {
@@ -173,12 +207,22 @@ export class StateManager extends EventEmitter {
           tile._savedRealBasePrice = tile.basePrice;
           tile._savedRealChange = tile.change;
           tile._savedRealTradeTs = tile.lastTradeTs;
+          tile._savedRealPreviousClose = tile.previousClose;
+          tile._savedRealOpen = tile.open;
+          tile._savedRealHigh = tile.high;
+          tile._savedRealLow = tile.low;
+          tile._savedRealVolume = tile.volume;
         }
 
         // Restore placeholder values for simulation
         tile.price = tile._placeholderPrice;
         tile.basePrice = tile._placeholderBasePrice;
         tile.change = 0;
+        tile.previousClose = tile._placeholderBasePrice;
+        tile.open = tile._placeholderPrice;
+        tile.high = tile._placeholderPrice;
+        tile.low = tile._placeholderPrice;
+        tile.volume = 0;
         tile.hasInfo = false;
         tile.lastTradeTs = 0;
       } else {
@@ -188,12 +232,22 @@ export class StateManager extends EventEmitter {
           tile.basePrice = tile._savedRealBasePrice;
           tile.change = tile._savedRealChange;
           tile.lastTradeTs = tile._savedRealTradeTs;
+          tile.previousClose = tile._savedRealPreviousClose;
+          tile.open = tile._savedRealOpen;
+          tile.high = tile._savedRealHigh;
+          tile.low = tile._savedRealLow;
+          tile.volume = tile._savedRealVolume;
           tile.hasInfo = true;
         } else {
           // Clear data for real mode (waiting for API)
           tile.price = null;
           tile.basePrice = null;
           tile.change = null;
+          tile.previousClose = null;
+          tile.open = null;
+          tile.high = null;
+          tile.low = null;
+          tile.volume = 0;
           tile.hasInfo = false;
           tile.lastTradeTs = 0;
         }
@@ -253,6 +307,11 @@ export class StateManager extends EventEmitter {
         price: tile.price,
         basePrice: tile.basePrice,
         change: tile.change,
+        previousClose: tile.previousClose,
+        open: tile.open,
+        high: tile.high,
+        low: tile.low,
+        volume: tile.volume,
         hasInfo: tile.hasInfo,
         lastTradeTs: tile.lastTradeTs
       })),
@@ -274,6 +333,11 @@ export class StateManager extends EventEmitter {
           price: tileData.price,
           basePrice: tileData.basePrice,
           change: tileData.change,
+          previousClose: tileData.previousClose,
+          open: tileData.open,
+          high: tileData.high,
+          low: tileData.low,
+          volume: tileData.volume,
           hasInfo: tileData.hasInfo,
           lastTradeTs: tileData.lastTradeTs
         });

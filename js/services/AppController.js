@@ -91,6 +91,7 @@ export class AppController {
 
       // Reset tiles but preserve any previously fetched real data
       this.state.resetAllTiles(true);
+      this._resetPriceHistoryForMode('real');
 
       // Initialize fetching progress counter
       this.fetchingTotal = this.assets.length;
@@ -114,6 +115,7 @@ export class AppController {
       this.transport.stop();
 
       // Reset tiles to simulation mode (saves real data for later)
+      this._resetPriceHistoryForMode('simulation');
       this.state.resetAllTiles(false);
 
       // Start simulation
@@ -279,13 +281,29 @@ export class AppController {
         change: tile.querySelector('.change'),
         canvas: tile.querySelector('.sparkline-canvas')
       });
-      
-      // Initialize price history
-      const asset = this.assets[index];
-      if (asset) {
-        this.priceHistory.set(asset.ticker, [asset.price]);
-      }
     });
+
+    // Seed initial history for simulation placeholders
+    this._resetPriceHistoryForMode('simulation');
+  }
+
+  /**
+   * Reset price history buffer according to mode
+   * @private
+   * @param {'simulation' | 'real'} mode
+   */
+  _resetPriceHistoryForMode(mode) {
+    this.priceHistory.clear();
+
+    if (mode === 'simulation') {
+      this.assets.forEach(asset => {
+        this.priceHistory.set(asset.ticker, [asset.price]);
+      });
+    } else {
+      this.assets.forEach(asset => {
+        this.priceHistory.set(asset.ticker, []);
+      });
+    }
   }
 
   /**
@@ -340,15 +358,25 @@ export class AppController {
 
     // API key visibility toggle
     const visibilityBtn = document.getElementById('api-key-visibility');
+    const copyBtn = document.getElementById('api-key-copy');
     const displayInput = document.getElementById('api-key-display');
     if (visibilityBtn && displayInput) {
       visibilityBtn.addEventListener('click', () => {
-        const currentType = displayInput.getAttribute('type');
-        const newType = currentType === 'password' ? 'text' : 'password';
-        displayInput.setAttribute('type', newType);
+        const isVisible = displayInput.dataset.visibility === 'visible';
+        this._setApiKeyVisibility(!isVisible);
+      });
+    }
 
-        // Update button icon
-        visibilityBtn.textContent = newType === 'password' ? '👁️' : '🙈';
+    if (copyBtn && displayInput) {
+      copyBtn.addEventListener('click', async () => {
+        const key = displayInput.dataset.actual || '';
+        if (!key) {
+          this._showToast('No API key to copy');
+          return;
+        }
+
+        const copied = await this._copyApiKey(key);
+        this._showToast(copied ? 'API key copied' : 'Unable to copy API key');
       });
     }
   }
@@ -359,28 +387,55 @@ export class AppController {
    */
   _updateTileClasses(element, change) {
     const thresholds = CONFIG.UI.THRESHOLDS;
+    const previousState = element.dataset.state || 'neutral';
 
     // Remove all state classes
     element.classList.remove('gaining', 'gaining-strong', 'losing', 'losing-strong', 'neutral');
 
     // If no data yet (change is null), keep neutral
-    if (change == null) {
-      element.classList.add('neutral');
-      return;
-    }
+    let nextState = 'neutral';
 
     // Add appropriate class based on change
-    if (change > thresholds.STRONG_GAIN) {
-      element.classList.add('gaining-strong');
+    if (change == null) {
+      nextState = 'neutral';
+    } else if (change > thresholds.STRONG_GAIN) {
+      nextState = 'gaining-strong';
     } else if (change > thresholds.MILD_GAIN) {
-      element.classList.add('gaining');
+      nextState = 'gaining';
     } else if (change < thresholds.STRONG_LOSS) {
-      element.classList.add('losing-strong');
+      nextState = 'losing-strong';
     } else if (change < thresholds.MILD_LOSS) {
-      element.classList.add('losing');
-    } else {
-      element.classList.add('neutral');
+      nextState = 'losing';
     }
+
+    element.classList.add(nextState);
+    element.dataset.state = nextState;
+
+    if (nextState !== previousState) {
+      this._animateTileStateChange(element);
+    }
+  }
+
+  /**
+   * Add a subtle flare when a tile changes state to ensure consistent feedback
+   * @private
+   */
+  _animateTileStateChange(element) {
+    if (!element) return;
+
+    if (element._stateChangeTimeout) {
+      clearTimeout(element._stateChangeTimeout);
+    }
+
+    element.classList.remove('tile-state-change');
+    // Force reflow so animation can retrigger
+    void element.offsetWidth;
+    element.classList.add('tile-state-change');
+
+    element._stateChangeTimeout = setTimeout(() => {
+      element.classList.remove('tile-state-change');
+      element._stateChangeTimeout = null;
+    }, 450);
   }
 
   /**
@@ -523,6 +578,19 @@ export class AppController {
       // Calculate price from base
       tile.price = tile.basePrice * (1 + tile.change / 100);
 
+      if (tile.open == null) {
+        tile.open = tile._placeholderPrice;
+      }
+      if (tile.previousClose == null) {
+        tile.previousClose = tile._placeholderBasePrice;
+      }
+
+      tile.high = tile.high != null ? Math.max(tile.high, tile.price) : tile.price;
+      tile.low = tile.low != null ? Math.min(tile.low, tile.price) : tile.price;
+      tile.volume = (tile.volume || 0) + Math.abs(changeAmount) * 850;
+      tile.volume = Math.min(tile.volume, 5000000);
+      tile.lastTradeTs = Date.now();
+
       // Update price history
       let history = this.priceHistory.get(asset.ticker) || [];
       history.push(tile.price);
@@ -558,9 +626,16 @@ export class AppController {
     const mode = this.state.getMode();
     const label = document.getElementById('mode-toggle-label');
     const toggle = document.getElementById('mode-toggle');
+    const caption = document.getElementById('mode-toggle-caption');
 
     if (label) {
       label.textContent = mode === 'real' ? 'Real Data' : 'Simulation';
+    }
+
+    if (caption) {
+      caption.textContent = mode === 'real'
+        ? 'Live market stream enabled'
+        : 'Simulation Active';
     }
 
     if (toggle) {
@@ -733,9 +808,16 @@ export class AppController {
     const display = document.getElementById('api-key-display');
     if (!display) return;
 
-    const masked = this._maskKey(key);
-    display.value = masked;
-    display.dataset.actual = key;
+    const actualKey = key || '';
+    display.dataset.actual = actualKey;
+    if (!display.dataset.visibility) {
+      display.dataset.visibility = 'masked';
+    }
+
+    const isVisible = display.dataset.visibility === 'visible';
+    display.value = isVisible ? actualKey : this._maskKey(actualKey);
+
+    this._syncApiKeyControls(actualKey);
   }
 
   /**
@@ -744,8 +826,94 @@ export class AppController {
    */
   _maskKey(key) {
     if (!key) return '';
-    if (key.length <= 6) return '•'.repeat(Math.max(0, key.length));
-    return key.slice(0, 3) + '•'.repeat(Math.max(0, key.length - 6)) + key.slice(-3);
+    if (key.length <= 10) return '•'.repeat(Math.max(0, key.length));
+    const visible = key.slice(-10);
+    const hiddenCount = Math.max(0, key.length - visible.length);
+    return '•'.repeat(hiddenCount) + visible;
+  }
+
+  /**
+   * Toggle API key visibility in UI
+   * @private
+   * @param {boolean} shouldShow
+   */
+  _setApiKeyVisibility(shouldShow) {
+    const display = document.getElementById('api-key-display');
+    if (!display) return;
+
+    const key = display.dataset.actual || '';
+    display.dataset.visibility = shouldShow ? 'visible' : 'masked';
+    display.value = shouldShow ? key : this._maskKey(key);
+
+    this._syncApiKeyControls(key);
+  }
+
+  /**
+   * Enable/disable API key action buttons and sync labels
+   * @private
+   * @param {string} key
+   */
+  _syncApiKeyControls(key) {
+    const hasKey = Boolean(key);
+    const visibilityBtn = document.getElementById('api-key-visibility');
+    const copyBtn = document.getElementById('api-key-copy');
+    const display = document.getElementById('api-key-display');
+    const isVisible = display?.dataset.visibility === 'visible';
+
+    if (visibilityBtn) {
+      visibilityBtn.disabled = !hasKey;
+      visibilityBtn.textContent = isVisible ? 'Hide' : 'Show';
+      visibilityBtn.setAttribute('aria-pressed', isVisible ? 'true' : 'false');
+    }
+
+    if (copyBtn) {
+      copyBtn.disabled = !hasKey;
+    }
+  }
+
+  /**
+   * Copy API key to clipboard
+   * @private
+   * @param {string} key
+   * @returns {Promise<boolean>}
+   */
+  async _copyApiKey(key) {
+    if (!key) return false;
+
+    try {
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        await navigator.clipboard.writeText(key);
+        return true;
+      }
+
+      const textarea = document.createElement('textarea');
+      textarea.value = key;
+      textarea.setAttribute('readonly', '');
+      textarea.style.position = 'absolute';
+      textarea.style.left = '-9999px';
+      document.body.appendChild(textarea);
+
+      const selection = document.getSelection();
+      const selectedRange = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+
+      textarea.select();
+      const success = document.execCommand('copy');
+      document.body.removeChild(textarea);
+
+      if (selectedRange && selection) {
+        selection.removeAllRanges();
+        selection.addRange(selectedRange);
+      }
+
+      if (!success) {
+        throw new Error('execCommand copy failed');
+      }
+
+      return true;
+    } catch (err) {
+      log.warn('Failed to copy API key', err);
+      return false;
+    }
   }
 
   /**

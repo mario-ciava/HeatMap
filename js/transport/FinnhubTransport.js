@@ -496,6 +496,10 @@ export class FinnhubTransport extends EventEmitter {
       price,
       previousClose,
       changePercent,
+      high: quoteData.high,
+      low: quoteData.low,
+      open: quoteData.open,
+      volume: quoteData.volume,
       timestamp
     });
 

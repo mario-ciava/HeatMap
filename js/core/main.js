@@ -69,6 +69,326 @@ const assets = [
   { ticker: 'GE', name: 'GE Aerospace', price: 164.30, basePrice: 164.30, change: 0, sector: 'Industrial' }
 ];
 
+const priceFormatter = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2
+});
+
+const volumeFormatter = new Intl.NumberFormat('en-US', {
+  notation: 'compact',
+  maximumFractionDigits: 2
+});
+
+function formatPrice(value) {
+  if (value == null || Number.isNaN(value)) return '---';
+  return priceFormatter.format(value);
+}
+
+function formatPercent(value) {
+  if (value == null || Number.isNaN(value)) return '---';
+  return `${value > 0 ? '+' : ''}${value.toFixed(2)}%`;
+}
+
+function formatVolume(value) {
+  if (value == null || Number.isNaN(value)) return '---';
+  if (value === 0) return '0';
+  return volumeFormatter.format(value);
+}
+
+function formatRelativeTime(timestamp) {
+  if (!timestamp) return '---';
+  const date = timestamp instanceof Date ? timestamp : new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return '---';
+
+  const now = Date.now();
+  const diff = now - date.getTime();
+  const seconds = Math.floor(diff / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+
+  if (minutes < 1) {
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  if (days === 0) {
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  if (days === 1) {
+    return `Yesterday ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+  }
+
+  if (days === 2) return '2 days ago';
+  if (days === 3) return '3 days ago';
+
+  return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
+
+const enhancedSelectWrappers = new Set();
+let openCustomSelect = null;
+
+function closeAllCustomSelects(except) {
+  enhancedSelectWrappers.forEach(wrapper => {
+    if (wrapper !== except && wrapper.classList.contains('open')) {
+      wrapper._close?.({ focusTrigger: false });
+    }
+  });
+}
+
+function enhanceDropdown(select) {
+  if (!select || select.dataset.enhanced === 'true') return;
+
+  const parent = select.parentElement;
+  if (!parent) return;
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'custom-select';
+
+  const dropdownId = `${select.id || `select-${Math.random().toString(36).slice(2)}`}-menu`;
+
+  const trigger = document.createElement('button');
+  trigger.type = 'button';
+  trigger.className = 'select-trigger';
+  trigger.setAttribute('aria-haspopup', 'listbox');
+  trigger.setAttribute('aria-expanded', 'false');
+  trigger.setAttribute('aria-controls', dropdownId);
+
+  const dropdown = document.createElement('div');
+  dropdown.className = 'select-dropdown';
+  dropdown.id = dropdownId;
+  dropdown.setAttribute('role', 'listbox');
+
+  const optionButtons = [];
+
+  const buildOptionButton = (option, index) => {
+    const optionBtn = document.createElement('button');
+    optionBtn.type = 'button';
+    optionBtn.className = 'select-option';
+    optionBtn.dataset.value = option.value;
+    optionBtn.setAttribute('role', 'option');
+    optionBtn.textContent = option.textContent;
+    optionBtn.tabIndex = -1;
+    optionBtn.setAttribute('aria-selected', option.selected ? 'true' : 'false');
+
+    optionBtn.addEventListener('click', () => {
+      if (select.value !== option.value) {
+        select.value = option.value;
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+      } else {
+        updateSelection();
+      }
+      closeDropdown();
+    });
+
+    optionBtn.addEventListener('keydown', event => {
+      const currentIndex = optionButtons.indexOf(optionBtn);
+
+      if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        const nextIndex = (currentIndex + 1) % optionButtons.length;
+        optionButtons[nextIndex].focus();
+        scrollOptionIntoView(optionButtons[nextIndex]);
+      } else if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        const prevIndex = (currentIndex - 1 + optionButtons.length) % optionButtons.length;
+        optionButtons[prevIndex].focus();
+        scrollOptionIntoView(optionButtons[prevIndex]);
+      } else if (event.key === 'Home') {
+        event.preventDefault();
+        optionButtons[0].focus();
+        scrollOptionIntoView(optionButtons[0]);
+      } else if (event.key === 'End') {
+        event.preventDefault();
+        const last = optionButtons[optionButtons.length - 1];
+        last.focus();
+        scrollOptionIntoView(last);
+      } else if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        optionBtn.click();
+      } else if (event.key === 'Escape') {
+        event.preventDefault();
+        closeDropdown();
+      } else if (event.key === 'Tab') {
+        closeDropdown({ focusTrigger: false });
+      }
+    });
+
+    dropdown.appendChild(optionBtn);
+    optionButtons.push(optionBtn);
+  };
+
+  Array.from(select.options).forEach(buildOptionButton);
+
+  parent.insertBefore(wrapper, select);
+  wrapper.appendChild(trigger);
+  wrapper.appendChild(dropdown);
+  wrapper.appendChild(select);
+
+  select.classList.add('select-native');
+  select.dataset.enhanced = 'true';
+  select.setAttribute('aria-hidden', 'true');
+
+  const updateSelection = () => {
+    const selectedOption = select.options[select.selectedIndex];
+    trigger.textContent = selectedOption ? selectedOption.textContent : 'Select';
+
+    optionButtons.forEach(button => {
+      const isSelected = button.dataset.value === select.value;
+      button.classList.toggle('selected', isSelected);
+      button.setAttribute('aria-selected', isSelected ? 'true' : 'false');
+    });
+  };
+
+  const scrollOptionIntoView = button => {
+    const buttonTop = button.offsetTop;
+    const buttonHeight = button.offsetHeight;
+    const viewTop = dropdown.scrollTop;
+    const viewBottom = viewTop + dropdown.clientHeight;
+
+    if (buttonTop < viewTop) {
+      dropdown.scrollTop = buttonTop;
+    } else if (buttonTop + buttonHeight > viewBottom) {
+      dropdown.scrollTop = buttonTop - dropdown.clientHeight + buttonHeight;
+    }
+  };
+
+  const closeDropdown = ({ focusTrigger = true } = {}) => {
+    if (!wrapper.classList.contains('open')) return;
+    wrapper.classList.remove('open');
+    trigger.setAttribute('aria-expanded', 'false');
+    optionButtons.forEach(button => (button.tabIndex = -1));
+    if (focusTrigger) {
+      trigger.focus({ preventScroll: true });
+    }
+    if (openCustomSelect === wrapper) {
+      openCustomSelect = null;
+    }
+  };
+
+  const openDropdown = () => {
+    if (wrapper.classList.contains('open')) return;
+    closeAllCustomSelects(wrapper);
+    wrapper.classList.add('open');
+    trigger.setAttribute('aria-expanded', 'true');
+    optionButtons.forEach(button => (button.tabIndex = 0));
+    const selectedBtn = optionButtons.find(btn => btn.dataset.value === select.value) || optionButtons[0];
+    if (selectedBtn) {
+      selectedBtn.focus();
+      scrollOptionIntoView(selectedBtn);
+    }
+    openCustomSelect = wrapper;
+  };
+
+  wrapper._close = closeDropdown;
+
+  trigger.addEventListener('click', event => {
+    event.preventDefault();
+    if (wrapper.classList.contains('open')) {
+      closeDropdown();
+    } else {
+      openDropdown();
+    }
+  });
+
+  trigger.addEventListener('keydown', event => {
+    if (['Enter', ' ', 'ArrowDown', 'ArrowUp'].includes(event.key)) {
+      event.preventDefault();
+      openDropdown();
+    }
+  });
+
+  wrapper.addEventListener('focusout', event => {
+    if (!wrapper.contains(event.relatedTarget)) {
+      closeDropdown({ focusTrigger: false });
+    }
+  });
+
+  select.addEventListener('change', updateSelection);
+  select.addEventListener('focus', () => {
+    trigger.focus({ preventScroll: true });
+    openDropdown();
+  });
+
+  const associatedLabel = parent.querySelector(`label[for="${select.id}"]`);
+  if (associatedLabel) {
+    associatedLabel.addEventListener('click', event => {
+      event.preventDefault();
+      trigger.focus({ preventScroll: true });
+      openDropdown();
+    });
+  }
+
+  updateSelection();
+  enhancedSelectWrappers.add(wrapper);
+}
+
+document.addEventListener('pointerdown', event => {
+  if (openCustomSelect && !openCustomSelect.contains(event.target)) {
+    openCustomSelect._close?.({ focusTrigger: false });
+  }
+});
+
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && openCustomSelect) {
+    openCustomSelect._close?.();
+  }
+});
+
+const addTickerModal = document.getElementById('add-ticker-modal');
+const addTickerClose = document.getElementById('add-ticker-close');
+const addTickerForm = document.getElementById('add-ticker-form');
+const addTickerInput = document.getElementById('add-ticker-input');
+const addTickerResults = document.getElementById('add-ticker-results');
+
+function openAddTickerModal() {
+  if (!addTickerModal) return;
+  addTickerModal.classList.add('active');
+  document.documentElement.style.overflow = 'hidden';
+  setTimeout(() => addTickerInput?.focus({ preventScroll: true }), 120);
+  closeAllCustomSelects();
+}
+
+function closeAddTickerModal() {
+  if (!addTickerModal) return;
+  addTickerModal.classList.remove('active');
+  document.documentElement.style.overflow = '';
+}
+
+if (addTickerClose) {
+  addTickerClose.addEventListener('click', closeAddTickerModal);
+}
+
+if (addTickerModal) {
+  addTickerModal.addEventListener('click', event => {
+    if (event.target === addTickerModal) {
+      closeAddTickerModal();
+    }
+  });
+}
+
+if (addTickerForm) {
+  addTickerForm.addEventListener('submit', event => {
+    event.preventDefault();
+    const query = addTickerInput?.value.trim();
+    if (!query) {
+      if (addTickerResults) addTickerResults.textContent = 'Please type a query to search for symbols.';
+      return;
+    }
+    if (addTickerResults) {
+      addTickerResults.textContent = `Ready to search Finnhub for "${query}" (Symbol Lookup).`;
+    }
+  });
+}
+
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && addTickerModal?.classList.contains('active')) {
+    closeAddTickerModal();
+  }
+});
+
 // ============================================================================
 // Global App Instance
 // ============================================================================
@@ -94,8 +414,9 @@ function initHeatmap() {
   // Create tiles
   assets.forEach((asset, index) => {
     const tile = document.createElement('div');
-    tile.className = 'asset-tile neutral';
+    tile.className = 'asset-tile neutral tile-enter';
     tile.dataset.index = index;
+    tile.dataset.state = 'neutral';
     tile.style.animationDelay = `${index * 0.03}s`;
 
     const canvas = document.createElement('canvas');
@@ -112,6 +433,12 @@ function initHeatmap() {
 
     tile.insertBefore(canvas, tile.firstChild);
 
+    tile.addEventListener('animationend', (event) => {
+      if (event.animationName === 'tileEntry') {
+        tile.classList.remove('tile-enter');
+      }
+    });
+
     // Add click handler for modal
     tile.addEventListener('click', () => showAssetDetails(index));
 
@@ -120,14 +447,22 @@ function initHeatmap() {
 
   // Create add tile button
   const addTile = document.createElement('div');
-  addTile.className = 'asset-tile add-tile';
+  addTile.className = 'asset-tile add-tile tile-enter';
   addTile.style.animationDelay = `${assets.length * 0.03}s`;
   addTile.innerHTML = `
     <div class="add-tile-icon">+</div>
-    <div class="add-tile-label">Add Ticker</div>
+    <div class="add-tile-text">
+      <span class="add-tile-title">Add</span>
+      <span class="add-tile-subtitle">ticker</span>
+    </div>
   `;
   addTile.addEventListener('click', () => {
-    showToast('Add ticker feature coming soon');
+    openAddTickerModal();
+  });
+  addTile.addEventListener('animationend', (event) => {
+    if (event.animationName === 'tileEntry') {
+      addTile.classList.remove('tile-enter');
+    }
   });
   heatmapContainer.appendChild(addTile);
 
@@ -162,6 +497,9 @@ function setupFiltersAndSearch() {
   const search = document.getElementById('asset-search');
   const filterSelect = document.getElementById('filter-select');
   const sortSelect = document.getElementById('sort-select');
+
+  enhanceDropdown(filterSelect);
+  enhanceDropdown(sortSelect);
 
   if (search) {
     search.addEventListener('input', debounce(applyFilters, 300));
@@ -448,68 +786,95 @@ function showAssetDetails(index) {
   document.getElementById('modal-ticker').textContent = asset.ticker;
   document.getElementById('modal-name').textContent = asset.name;
 
-  // Handle cases where price might be null (in real mode without data)
-  const currentPrice = tileState?.price;
-  const currentChange = tileState?.change;
+  const currentPrice = tileState?.price ?? (mode === 'simulation' ? asset.price : null);
+  const currentChange = tileState?.change ?? (mode === 'simulation' ? asset.change : null);
 
-  // Build details HTML
-  let detailsHTML = `
-    <div class="detail-row">
-      <span class="detail-label">Current Price</span>
-      <span class="detail-value">${currentPrice != null ? `$${currentPrice.toFixed(2)}` : '---'}</span>
-    </div>
-    <div class="detail-row">
-      <span class="detail-label">Change</span>
-      <span class="detail-value" style="color: ${currentChange > 0 ? '#10b981' : currentChange < 0 ? '#ef4444' : '#8b92a4'}">
-        ${currentChange != null ? `${currentChange > 0 ? '+' : ''}${currentChange.toFixed(2)}%` : '---'}
-      </span>
-    </div>
-  `;
-
-  // Only show "Session Total" in simulation mode
-  if (mode === 'simulation') {
-    const firstPrice = history[0] || asset.basePrice;
-    let sessionChange = '0.00';
-    if (currentPrice != null && firstPrice != null) {
-      sessionChange = ((currentPrice - firstPrice) / firstPrice * 100).toFixed(2);
-    }
-
-    detailsHTML += `
+  const detailRows = [];
+  const addRow = (label, value, options = {}) => {
+    const safeValue = value ?? '---';
+    const styleAttr = options.color ? ` style="color: ${options.color}"` : '';
+    detailRows.push(`
       <div class="detail-row">
-        <span class="detail-label">Session Total</span>
-        <span class="detail-value" style="color: ${sessionChange > 0 ? '#10b981' : sessionChange < 0 ? '#ef4444' : '#8b92a4'}">
-          ${sessionChange !== '0.00' ? `${sessionChange > 0 ? '+' : ''}${sessionChange}%` : '---'}
-        </span>
+        <span class="detail-label">${label}</span>
+        <span class="detail-value"${styleAttr}>${safeValue}</span>
       </div>
-    `;
+    `);
+  };
+
+  addRow('Current Price', formatPrice(currentPrice));
+
+  const changeColor = currentChange > 0 ? '#10b981' : currentChange < 0 ? '#ef4444' : null;
+  const changeDisplay = currentChange != null ? formatPercent(currentChange) : '---';
+  addRow('Change', changeDisplay, changeColor ? { color: changeColor } : undefined);
+
+  if (mode === 'simulation') {
+    const firstPrice = history.length ? history[0] : asset.basePrice;
+    let sessionChange = null;
+    if (currentPrice != null && firstPrice != null && firstPrice !== 0) {
+      sessionChange = ((currentPrice - firstPrice) / firstPrice) * 100;
+    }
+    const sessionColor = sessionChange > 0 ? '#10b981' : sessionChange < 0 ? '#ef4444' : null;
+    addRow('Session Total', formatPercent(sessionChange), sessionColor ? { color: sessionColor } : undefined);
   }
 
-  detailsHTML += `
-    <div class="detail-row">
-      <span class="detail-label">Sector</span>
-      <span class="detail-value">${asset.sector}</span>
-    </div>
-  `;
+  addRow('Sector', asset.sector);
 
-  document.getElementById('modal-details').innerHTML = detailsHTML;
+  const chartHistory = history.length ? [...history] : (currentPrice != null ? [currentPrice] : []);
+
+  const openValue = mode === 'real'
+    ? tileState?.open
+    : (chartHistory[0] ?? tileState?._placeholderPrice ?? asset.price);
+
+  const previousCloseValue = mode === 'real'
+    ? (tileState?.previousClose ?? tileState?.basePrice)
+    : (tileState?.previousClose ?? tileState?._placeholderBasePrice ?? asset.basePrice);
+
+  const highValue = mode === 'real'
+    ? tileState?.high
+    : (chartHistory.length ? Math.max(...chartHistory) : openValue);
+
+  const lowValue = mode === 'real'
+    ? tileState?.low
+    : (chartHistory.length ? Math.min(...chartHistory) : openValue);
+
+  const volumeValue = tileState?.volume;
+  const lastTradeLabel = mode === 'real'
+    ? formatRelativeTime(tileState?.lastTradeTs)
+    : 'Simulated feed';
+
+  addRow('Open', formatPrice(openValue));
+  addRow('Previous Close', formatPrice(previousCloseValue));
+  addRow('Day High', formatPrice(highValue));
+  addRow('Day Low', formatPrice(lowValue));
+  addRow('Volume', formatVolume(volumeValue));
+  addRow('Last Trade', lastTradeLabel);
+
+  document.getElementById('modal-details').innerHTML = detailRows.join('');
+
+  const chartRange = document.getElementById('chart-time-range');
+  if (chartRange) {
+    chartRange.textContent = mode === 'real' ? 'Live Stream' : 'Simulation Session';
+  }
 
   const modal = document.getElementById('modal');
   modal.classList.add('active');
   document.documentElement.style.overflow = 'hidden';
 
-  setTimeout(() => drawModalChart(history), 150);
+  resetChartOverlays();
+  setTimeout(() => drawModalChart(chartHistory), 150);
 }
 
 function closeModal() {
   const modal = document.getElementById('modal');
   modal.classList.remove('active');
   document.documentElement.style.overflow = '';
+  resetChartOverlays();
 }
 
 function drawModalChart(history) {
-  if (history.length < 2) return;
-
   const canvas = document.getElementById('modal-chart');
+  if (!canvas) return;
+
   const ctx = canvas.getContext('2d');
   canvas.width = canvas.offsetWidth;
   canvas.height = canvas.offsetHeight;
@@ -518,23 +883,36 @@ function drawModalChart(history) {
 
   ctx.clearRect(0, 0, width, height);
 
-  const min = Math.min(...history);
-  const max = Math.max(...history);
-  const range = max - min || 1;
-  const trend = history[history.length - 1] - history[0];
+  const series = Array.isArray(history) ? history.slice() : [];
+  if (series.length === 1) {
+    series.push(series[0]);
+  }
 
-  // Y-axis labels
   const yAxisContainer = document.getElementById('chart-y-axis');
+
+  if (series.length < 2) {
+    if (yAxisContainer) {
+      yAxisContainer.innerHTML = '';
+    }
+    canvas.__chartData = null;
+    resetChartOverlays();
+    return;
+  }
+
+  const min = Math.min(...series);
+  const max = Math.max(...series);
+  const range = max - min || 1;
+  const trend = series[series.length - 1] - series[0];
+
   if (yAxisContainer) {
     yAxisContainer.innerHTML = `
-      <div>$${max.toFixed(2)}</div>
-      <div>$${((max + min) / 2).toFixed(2)}</div>
-      <div>$${min.toFixed(2)}</div>
+      <div>${formatPrice(max)}</div>
+      <div>${formatPrice((max + min) / 2)}</div>
+      <div>${formatPrice(min)}</div>
     `;
   }
 
-  // Grid lines
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
   ctx.lineWidth = 1;
   for (let i = 0; i <= 4; i++) {
     const y = (height / 4) * i;
@@ -544,47 +922,133 @@ function drawModalChart(history) {
     ctx.stroke();
   }
 
-  // Gradient fill
+  const points = series.map((price, index) => {
+    const x = (index / (series.length - 1)) * width;
+    const y = height - ((price - min) / range) * height * 0.82 - height * 0.09;
+    return { x, y, value: price };
+  });
+
+  const lineColor = trend >= 0 ? '#10b981' : '#ef4444';
+
   const gradient = ctx.createLinearGradient(0, 0, 0, height);
-  if (trend > 0) {
-    gradient.addColorStop(0, 'rgba(16, 185, 129, 0.15)');
-    gradient.addColorStop(1, 'rgba(16, 185, 129, 0.01)');
+  if (trend >= 0) {
+    gradient.addColorStop(0, 'rgba(16, 185, 129, 0.2)');
+    gradient.addColorStop(1, 'rgba(16, 185, 129, 0.02)');
   } else {
-    gradient.addColorStop(0, 'rgba(239, 68, 68, 0.15)');
-    gradient.addColorStop(1, 'rgba(239, 68, 68, 0.01)');
+    gradient.addColorStop(0, 'rgba(239, 68, 68, 0.2)');
+    gradient.addColorStop(1, 'rgba(239, 68, 68, 0.02)');
   }
 
   ctx.fillStyle = gradient;
   ctx.beginPath();
-  ctx.moveTo(0, height);
-
-  history.forEach((p, i) => {
-    const x = (i / (history.length - 1)) * width;
-    const y = height - ((p - min) / range) * height * 0.85 - height * 0.075;
-    ctx.lineTo(x, y);
-  });
-
-  ctx.lineTo(width, height);
+  ctx.moveTo(points[0].x, height);
+  points.forEach(point => ctx.lineTo(point.x, point.y));
+  ctx.lineTo(points[points.length - 1].x, height);
   ctx.closePath();
   ctx.fill();
 
-  // Main line
-  ctx.strokeStyle = trend > 0 ? '#10b981' : '#ef4444';
+  ctx.strokeStyle = lineColor;
   ctx.lineWidth = 3;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-  ctx.shadowColor = trend > 0 ? 'rgba(16, 185, 129, 0.4)' : 'rgba(239, 68, 68, 0.4)';
-  ctx.shadowBlur = 10;
+  ctx.shadowColor = trend >= 0 ? 'rgba(16, 185, 129, 0.35)' : 'rgba(239, 68, 68, 0.35)';
+  ctx.shadowBlur = 12;
   ctx.beginPath();
-
-  history.forEach((p, i) => {
-    const x = (i / (history.length - 1)) * width;
-    const y = height - ((p - min) / range) * height * 0.85 - height * 0.075;
-    if (i === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
+  points.forEach((point, index) => {
+    if (index === 0) ctx.moveTo(point.x, point.y);
+    else ctx.lineTo(point.x, point.y);
   });
-
   ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  canvas.__chartData = { points, width, height, color: lineColor };
+  attachModalChartInteractions(canvas);
+}
+
+function resetChartOverlays() {
+  const tooltip = document.getElementById('chart-tooltip');
+  const cursor = document.getElementById('chart-cursor');
+  const pointer = document.getElementById('chart-pointer');
+
+  if (tooltip) {
+    tooltip.classList.remove('visible');
+    tooltip.style.left = '-9999px';
+    tooltip.style.top = '-9999px';
+  }
+
+  if (cursor) {
+    cursor.classList.remove('visible');
+  }
+
+  if (pointer) {
+    pointer.classList.remove('visible');
+    pointer.style.left = '-9999px';
+    pointer.style.top = '-9999px';
+  }
+}
+
+function attachModalChartInteractions(canvas) {
+  if (canvas.__chartInteractionsAttached) return;
+
+  const tooltip = document.getElementById('chart-tooltip');
+  const cursor = document.getElementById('chart-cursor');
+  const pointer = document.getElementById('chart-pointer');
+  if (!tooltip || !cursor || !pointer) return;
+
+  const wrapper = canvas.parentElement;
+
+  const handleMove = (event) => {
+    const data = canvas.__chartData;
+    if (!data || !data.points || data.points.length === 0) {
+      resetChartOverlays();
+      return;
+    }
+
+    const rect = canvas.getBoundingClientRect();
+    const relativeX = event.clientX - rect.left;
+    const clampedX = Math.max(0, Math.min(rect.width, relativeX));
+    const index = Math.round((clampedX / rect.width) * (data.points.length - 1));
+    const point = data.points[index];
+
+    if (!point) {
+      resetChartOverlays();
+      return;
+    }
+
+    const offsetLeft = canvas.offsetLeft;
+    const offsetTop = canvas.offsetTop;
+    const wrapperWidth = wrapper.offsetWidth;
+    const pointerSize = pointer.offsetWidth || 12;
+    const accentColor = data.color || '#3b82f6';
+
+    cursor.style.left = `${offsetLeft + point.x}px`;
+    cursor.classList.add('visible');
+
+    pointer.style.left = `${offsetLeft + point.x - pointerSize / 2}px`;
+    pointer.style.top = `${offsetTop + point.y - pointerSize / 2}px`;
+    pointer.style.background = accentColor;
+    pointer.style.boxShadow = `0 0 12px ${accentColor}55`;
+    pointer.classList.add('visible');
+
+    tooltip.textContent = formatPrice(point.value);
+    tooltip.style.borderColor = `${accentColor}66`;
+    let tooltipLeft = offsetLeft + point.x + 12;
+    const tooltipWidth = tooltip.offsetWidth || 96;
+    if (tooltipLeft + tooltipWidth > wrapperWidth) {
+      tooltipLeft = offsetLeft + point.x - tooltipWidth - 12;
+    }
+    tooltip.style.left = `${tooltipLeft}px`;
+    tooltip.style.top = `${Math.max(8, offsetTop + point.y - 32)}px`;
+    tooltip.classList.add('visible');
+  };
+
+  const handleLeave = () => {
+    resetChartOverlays();
+  };
+
+  canvas.addEventListener('mousemove', handleMove);
+  canvas.addEventListener('mouseleave', handleLeave);
+  canvas.__chartInteractionsAttached = true;
 }
 
 // ============================================================================
