@@ -1,239 +1,361 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="utf-8"/>
-    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
     <title>Advanced Profit/Loss Heatmap - Enhanced Edition</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>📊</text></svg>"/>
-    <link href="styles.css" rel="stylesheet"/>
-</head>
-<body>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>📊</text></svg>"
+    />
+    <link href="css/tokens.css" rel="stylesheet" />
+    <link href="css/animations.css" rel="stylesheet" />
+    <link href="css/base.css" rel="stylesheet" />
+    <link href="css/control-panel.css" rel="stylesheet" />
+    <link href="css/tiles.css" rel="stylesheet" />
+    <link href="css/components.css" rel="stylesheet" />
+    <link href="css/real-mode.css" rel="stylesheet" />
+  </head>
+  <body>
     <div class="theme-selector">
-        <button class="theme-btn" id="theme-btn" title="Change Theme">🎨</button>
+      <button class="theme-btn" id="theme-btn" title="Change Theme">🎨</button>
     </div>
-    
+
     <div class="container">
-        <div class="header">
-            <h1 class="title">Profit/Loss Heatmap</h1>
-            <p class="subtitle">Real-Time Thermal Market Visualization</p>
+      <div class="header">
+        <h1 class="title">Profit/Loss Heatmap</h1>
+        <p class="subtitle">Real-Time Thermal Market Visualization</p>
+      </div>
+
+      <div class="control-panel">
+        <div class="control-panel-header">
+          <h3 class="control-panel-title">Control Panel</h3>
+          <div class="status-indicator" id="status-indicator">
+            <span class="status-dot"></span>
+            <span class="status-text">Live</span>
+          </div>
         </div>
-        
-        <div class="control-panel">
-            <div class="control-panel-header">
-                <h3 class="control-panel-title">Control Panel</h3>
-                <div class="status-indicator" id="status-indicator">
-                    <span class="status-dot"></span>
-                    <span class="status-text">Live</span>
-                </div>
+
+        <div class="control-panel-body">
+          <!-- Filters Row: Search, Filter, Sort -->
+          <div class="control-section filters-row">
+            <div class="control-group">
+              <label class="control-label">
+                <span class="icon">🔍</span>
+                Search
+              </label>
+              <input
+                class="search-input"
+                id="asset-search"
+                placeholder="Search ticker, company or sector..."
+                type="text"
+              />
             </div>
-            
-            <div class="control-panel-body">
-                <!-- Filters Row: Search, Filter, Sort -->
-                <div class="control-section filters-row">
-                    <div class="control-group">
-                        <label class="control-label">
-                            <span class="icon">🔍</span>
-                            Search
-                        </label>
-                        <input class="search-input" id="asset-search" placeholder="Search ticker, company or sector..." type="text"/>
+            <div class="control-group">
+              <label class="control-label">
+                <span class="icon">📊</span>
+                Filter
+              </label>
+              <select class="filter-select" id="filter-select">
+                <option value="all">All Assets</option>
+                <option value="gaining">📈 Gaining</option>
+                <option value="losing">📉 Losing</option>
+                <option value="neutral">➖ Neutral</option>
+              </select>
+            </div>
+            <div class="control-group">
+              <label class="control-label">
+                <span class="icon">🔄</span>
+                Sort By
+              </label>
+              <select class="filter-select" id="sort-select">
+                <option value="default">Default Order</option>
+                <option value="change-desc">Highest Change</option>
+                <option value="change-asc">Lowest Change</option>
+                <option value="price-desc">Highest Price</option>
+                <option value="price-asc">Lowest Price</option>
+                <option value="ticker">Alphabetical</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Mode Selection -->
+          <div class="control-section mode-section">
+            <div class="mode-card">
+              <div class="mode-meta">
+                <span class="mode-title">Data Feed</span>
+                <span class="mode-caption" id="mode-toggle-caption"
+                  >Simulation Active</span
+                >
+              </div>
+              <div class="mode-switch" title="Real Data / Simulation">
+                <label class="switch">
+                  <input
+                    aria-label="Real Data"
+                    id="mode-toggle"
+                    type="checkbox"
+                  />
+                  <span class="slider"></span>
+                </label>
+                <span id="mode-toggle-label">Simulation</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sliders Section -->
+          <div class="control-section sliders">
+            <div class="slider-control">
+              <div class="slider-header">
+                <span class="slider-label">Volatility</span>
+                <span class="slider-value" id="volatility-value">1.00x</span>
+              </div>
+              <div class="slider-wrapper">
+                <input
+                  id="volatility-slider"
+                  max="7.5"
+                  min="0"
+                  step="0.05"
+                  type="range"
+                  value="1.0"
+                />
+                <div class="slider-range">
+                  <span>0.0x</span>
+                  <span>7.5x</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="slider-control">
+              <div class="slider-header">
+                <span class="slider-label">Update Delay</span>
+                <span class="slider-value" id="speed-value">1000ms</span>
+              </div>
+              <div class="slider-wrapper">
+                <input
+                  id="speed-slider"
+                  max="5000"
+                  min="250"
+                  step="50"
+                  type="range"
+                  value="1000"
+                />
+                <div class="slider-range">
+                  <span>250ms</span>
+                  <span>5000ms</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Real Data: Finnhub API Key management -->
+          <div class="control-section api-key-section real-only">
+            <details class="api-settings">
+              <summary class="control-label">
+                <span class="icon">🔐</span> Finnhub API Key Settings
+              </summary>
+              <div class="api-settings-content">
+                <div class="api-fields">
+                  <div class="api-field-block">
+                    <label class="api-label" for="api-key-input"
+                      >New API Key</label
+                    >
+                    <div class="api-field">
+                      <input
+                        autocomplete="off"
+                        class="api-input"
+                        id="api-key-input"
+                        placeholder="Paste your Finnhub API key"
+                        type="password"
+                      />
+                      <button
+                        class="api-action-btn api-save-btn"
+                        id="api-key-save"
+                        type="button"
+                      >
+                        Save
+                      </button>
                     </div>
-                    <div class="control-group">
-                        <label class="control-label">
-                            <span class="icon">📊</span>
-                            Filter
-                        </label>
-                        <select class="filter-select" id="filter-select">
-                            <option value="all">All Assets</option>
-                            <option value="gaining">📈 Gaining</option>
-                            <option value="losing">📉 Losing</option>
-                            <option value="neutral">➖ Neutral</option>
-                        </select>
+                  </div>
+
+                  <div class="api-field-block">
+                    <label class="api-label" for="api-key-display"
+                      >Current API Key</label
+                    >
+                    <div class="api-field">
+                      <input
+                        aria-label="Finnhub API Key (masked)"
+                        class="api-input"
+                        id="api-key-display"
+                        readonly
+                        type="text"
+                      />
+                      <div class="api-field-actions">
+                        <button
+                          aria-label="Copy API key"
+                          class="api-action-btn api-copy-btn"
+                          id="api-key-copy"
+                          title="Copy API key"
+                          type="button"
+                        >
+                          Copy
+                        </button>
+                        <button
+                          aria-label="Toggle API key visibility"
+                          class="api-action-btn api-visibility-btn"
+                          id="api-key-visibility"
+                          title="Show or hide API key"
+                          type="button"
+                        >
+                          Show
+                        </button>
+                      </div>
                     </div>
-                    <div class="control-group">
-                        <label class="control-label">
-                            <span class="icon">🔄</span>
-                            Sort By
-                        </label>
-                        <select class="filter-select" id="sort-select">
-                            <option value="default">Default Order</option>
-                            <option value="change-desc">Highest Change</option>
-                            <option value="change-asc">Lowest Change</option>
-                            <option value="price-desc">Highest Price</option>
-                            <option value="price-asc">Lowest Price</option>
-                            <option value="ticker">Alphabetical</option>
-                        </select>
-                    </div>
+                  </div>
                 </div>
 
-                <!-- Mode Selection -->
-                <div class="control-section mode-section">
-                    <div class="mode-card">
-                        <div class="mode-meta">
-                            <span class="mode-title">Data Feed</span>
-                            <span class="mode-caption" id="mode-toggle-caption">Simulation Active</span>
-                        </div>
-                        <div class="mode-switch" title="Real Data / Simulation">
-                            <label class="switch">
-                                <input aria-label="Real Data" id="mode-toggle" type="checkbox"/>
-                                <span class="slider"></span>
-                            </label>
-                            <span id="mode-toggle-label">Simulation</span>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Sliders Section -->
-                <div class="control-section sliders">
-                    <div class="slider-control">
-                        <div class="slider-header">
-                            <span class="slider-label">Volatility</span>
-                            <span class="slider-value" id="volatility-value">1.00x</span>
-                        </div>
-                        <div class="slider-wrapper">
-                            <input id="volatility-slider" max="7.5" min="0" step="0.05" type="range" value="1.0"/>
-                            <div class="slider-range">
-                                <span>0.0x</span>
-                                <span>7.5x</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="slider-control">
-                        <div class="slider-header">
-                            <span class="slider-label">Update Delay</span>
-                            <span class="slider-value" id="speed-value">1000ms</span>
-                        </div>
-                        <div class="slider-wrapper">
-                            <input id="speed-slider" max="5000" min="250" step="50" type="range" value="1000"/>
-                            <div class="slider-range">
-                                <span>250ms</span>
-                                <span>5000ms</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Real Data: Finnhub API Key management -->
-                <div class="control-section api-key-section real-only">
-                    <details class="api-settings">
-                        <summary class="control-label">
-                            <span class="icon">🔐</span> Finnhub API Key Settings
-                        </summary>
-                        <div class="api-settings-content">
-                            <div class="api-fields">
-                                <div class="api-field-block">
-                                    <label class="api-label" for="api-key-input">New API Key</label>
-                                    <div class="api-field">
-                                        <input autocomplete="off" class="api-input" id="api-key-input" placeholder="Paste your Finnhub API key" type="password"/>
-                                        <button class="api-action-btn api-save-btn" id="api-key-save" type="button">Save</button>
-                                    </div>
-                                </div>
-
-                                <div class="api-field-block">
-                                    <label class="api-label" for="api-key-display">Current API Key</label>
-                                    <div class="api-field">
-                                        <input aria-label="Finnhub API Key (masked)" class="api-input" id="api-key-display" readonly type="text"/>
-                                        <div class="api-field-actions">
-                                            <button aria-label="Copy API key" class="api-action-btn api-copy-btn" id="api-key-copy" title="Copy API key" type="button">Copy</button>
-                                            <button aria-label="Toggle API key visibility" class="api-action-btn api-visibility-btn" id="api-key-visibility" title="Show or hide API key" type="button">Show</button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <p class="api-info-text">Your API key is stored locally in your browser (LocalStorage).</p>
-                            <p class="api-info-text">Get your free API key at <a href="https://finnhub.io" target="_blank" rel="noopener">finnhub.io</a>.</p>
-                        </div>
-                    </details>
-                </div>
-            </div>
+                <p class="api-info-text">
+                  Your API key is stored locally in your browser (LocalStorage).
+                </p>
+                <p class="api-info-text">
+                  Get your free API key at
+                  <a href="https://finnhub.io" target="_blank" rel="noopener"
+                    >finnhub.io</a
+                  >.
+                </p>
+              </div>
+            </details>
+          </div>
         </div>
-        
-        <div class="stats-bar">
-            <div class="stat">
-                <span class="stat-label">Total</span>
-                <span class="stat-value neutral" id="totalAssets">50</span>
-            </div>
-            <div class="stat">
-                <span class="stat-label">Gaining</span>
-                <span class="stat-value positive" id="gaining">0</span>
-            </div>
-            <div class="stat">
-                <span class="stat-label">Losing</span>
-                <span class="stat-value negative" id="losing">0</span>
-            </div>
-            <div class="stat">
-                <span class="stat-label">Market Temp</span>
-                <span class="stat-value neutral" id="marketTemp">0°C</span>
-            </div>
-            <div class="stat">
-                <span class="stat-label">Volatility</span>
-                <span class="stat-value neutral" id="volatility">0%</span>
-            </div>
-            <div class="stat">
-                <span class="stat-label">Avg Change</span>
-                <span class="stat-value neutral" id="avgChange">0%</span>
-            </div>
+      </div>
+
+      <div class="stats-bar">
+        <div class="stat">
+          <span class="stat-label">Total</span>
+          <span class="stat-value neutral" id="totalAssets">50</span>
         </div>
-        
-        <div class="heatmap-grid" id="heatmap"></div>
+        <div class="stat">
+          <span class="stat-label">Gaining</span>
+          <span class="stat-value positive" id="gaining">0</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Losing</span>
+          <span class="stat-value negative" id="losing">0</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Market Temp</span>
+          <span class="stat-value neutral" id="marketTemp">0°C</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Volatility</span>
+          <span class="stat-value neutral" id="volatility">0%</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Avg Change</span>
+          <span class="stat-value neutral" id="avgChange">0%</span>
+        </div>
+      </div>
+
+      <div class="heatmap-grid" id="heatmap"></div>
     </div>
-    
+
     <div class="controls">
-        <button class="control-btn" id="btn-toggle-animation">Toggle Animation</button>
-        <button class="control-btn" id="btn-market-crash">Market Crash</button>
-        <button class="control-btn" id="btn-bull-run">Bull Run</button>
-        <button class="control-btn" id="btn-reset">Reset</button>
-        <button class="control-btn" id="btn-export">Export</button>
+      <button class="control-btn" id="btn-toggle-animation">
+        Toggle Animation
+      </button>
+      <button class="control-btn" id="btn-market-crash">Market Crash</button>
+      <button class="control-btn" id="btn-bull-run">Bull Run</button>
+      <button class="control-btn" id="btn-reset">Reset</button>
+      <button class="control-btn" id="btn-export">Export</button>
     </div>
 
     <!-- Modal -->
-    <div aria-labelledby="modal-ticker" aria-modal="true" class="modal-overlay" id="modal" role="dialog">
-        <div class="modal-content">
-            <button aria-label="Close" class="modal-close" id="modal-close-btn">×</button>
-            <h2 class="modal-ticker" id="modal-ticker"></h2>
-            <p class="modal-name" id="modal-name"></p>
-            <div class="modal-details" id="modal-details"></div>
-            <div class="modal-chart-container">
-                <div class="modal-chart-title">Price History</div>
-                <div class="modal-chart-wrapper">
-                    <div class="chart-y-axis" id="chart-y-axis"></div>
-                    <canvas class="modal-chart" id="modal-chart"></canvas>
-                    <div aria-hidden="true" class="chart-cursor" id="chart-cursor"></div>
-                    <div aria-hidden="true" class="chart-pointer" id="chart-pointer"></div>
-                    <div aria-hidden="true" class="chart-tooltip" id="chart-tooltip"></div>
-                </div>
-                <div class="chart-labels">
-                    <span>Start</span>
-                    <span id="chart-time-range">Session</span>
-                    <span>Now</span>
-                </div>
-            </div>
+    <div
+      aria-labelledby="modal-ticker"
+      aria-modal="true"
+      class="modal-overlay"
+      id="modal"
+      role="dialog"
+    >
+      <div class="modal-content">
+        <button aria-label="Close" class="modal-close" id="modal-close-btn">
+          ×
+        </button>
+        <h2 class="modal-ticker" id="modal-ticker"></h2>
+        <p class="modal-name" id="modal-name"></p>
+        <div class="modal-details" id="modal-details"></div>
+        <div class="modal-chart-container">
+          <div class="modal-chart-title">Price History</div>
+          <div class="modal-chart-wrapper">
+            <div class="chart-y-axis" id="chart-y-axis"></div>
+            <canvas class="modal-chart" id="modal-chart"></canvas>
+            <div
+              aria-hidden="true"
+              class="chart-cursor"
+              id="chart-cursor"
+            ></div>
+            <div
+              aria-hidden="true"
+              class="chart-pointer"
+              id="chart-pointer"
+            ></div>
+            <div
+              aria-hidden="true"
+              class="chart-tooltip"
+              id="chart-tooltip"
+            ></div>
+          </div>
+          <div class="chart-labels">
+            <span>Start</span>
+            <span id="chart-time-range">Session</span>
+            <span>Now</span>
+          </div>
         </div>
+      </div>
     </div>
 
     <!-- Add Ticker Modal -->
-    <div aria-labelledby="add-ticker-title" aria-modal="true" class="modal-overlay" id="add-ticker-modal" role="dialog">
-        <div class="add-ticker-modal">
-            <button aria-label="Close" class="modal-close" id="add-ticker-close">×</button>
-            <div class="add-ticker-header">
-                <h2 id="add-ticker-title">Add New Ticker</h2>
-                <p>Search for symbols to add them to your heatmap.</p>
-            </div>
-            <form class="add-ticker-form" id="add-ticker-form">
-                <label class="add-ticker-label" for="add-ticker-input">Symbol or Company Name</label>
-                <div class="add-ticker-field">
-                    <input autocomplete="off" id="add-ticker-input" name="query" placeholder="Type at least two characters..." required type="text" />
-                    <button type="submit">Search</button>
-                </div>
-            </form>
-            <div aria-live="polite" class="add-ticker-results" id="add-ticker-results"></div>
+    <div
+      aria-labelledby="add-ticker-title"
+      aria-modal="true"
+      class="modal-overlay"
+      id="add-ticker-modal"
+      role="dialog"
+    >
+      <div class="add-ticker-modal">
+        <button aria-label="Close" class="modal-close" id="add-ticker-close">
+          ×
+        </button>
+        <div class="add-ticker-header">
+          <h2 id="add-ticker-title">Add New Ticker</h2>
+          <p>Search for symbols to add them to your heatmap.</p>
         </div>
+        <form class="add-ticker-form" id="add-ticker-form">
+          <label class="add-ticker-label" for="add-ticker-input"
+            >Symbol or Company Name</label
+          >
+          <div class="add-ticker-field">
+            <input
+              autocomplete="off"
+              id="add-ticker-input"
+              name="query"
+              placeholder="Type at least two characters..."
+              required
+              type="text"
+            />
+            <button type="submit">Search</button>
+          </div>
+        </form>
+        <div
+          aria-live="polite"
+          class="add-ticker-results"
+          id="add-ticker-results"
+        ></div>
+      </div>
     </div>
 
     <div aria-live="polite" class="toast" id="toast" role="status"></div>
 
     <!-- Load main application as ES6 module -->
     <script type="module" src="./js/core/main.js"></script>
-</body>
+  </body>
 </html>

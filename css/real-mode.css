@@ -1,0 +1,86 @@
+/* Real-mode transitions */
+body.real-mode .control-section.sliders {
+  max-height: 0 !important;
+  opacity: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
+body.real-mode .controls {
+  max-height: 0 !important;
+  opacity: 0 !important;
+  overflow: hidden !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  transition:
+    max-height 0.6s var(--ease-standard),
+    opacity 0.5s var(--ease-standard),
+    margin 0.6s var(--ease-standard),
+    padding 0.6s var(--ease-standard);
+}
+
+body.real-mode .live-indicator {
+  display: none !important;
+}
+
+body.real-mode .heatmap-grid {
+  margin-top: 60px;
+}
+
+body.real-mode .real-only {
+  max-height: 1000px;
+  opacity: 1;
+}
+
+body:not(.real-mode) .api-key-section {
+  display: none !important;
+}
+
+/* Real-time status indicator */
+.asset-tile .status-dot {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid rgba(0, 0, 0, 0.45);
+  box-shadow:
+    0 0 8px rgba(0, 0, 0, 0.35),
+    0 0 0 2px rgba(255, 255, 255, 0.9);
+  opacity: 0.98;
+  transform: translateZ(0);
+  backdrop-filter: blur(1px);
+}
+
+.asset-tile .status-dot.pulsing {
+  animation: livePulse 2s ease-in-out infinite;
+}
+
+.asset-tile .status-dot.open {
+  background: #10b981;
+  box-shadow:
+    0 0 10px rgba(16, 185, 129, 0.65),
+    0 0 0 2px rgba(255, 255, 255, 0.9);
+}
+
+.asset-tile .status-dot.pre,
+.asset-tile .status-dot.post,
+.asset-tile .status-dot.standby {
+  background: #f59e0b;
+  box-shadow:
+    0 0 10px rgba(245, 158, 11, 0.65),
+    0 0 0 2px rgba(255, 255, 255, 0.9);
+}
+
+.asset-tile .status-dot.closed {
+  background: #ef4444;
+  box-shadow:
+    0 0 10px rgba(239, 68, 68, 0.65),
+    0 0 0 2px rgba(255, 255, 255, 0.9);
+}
+
+body:not(.real-mode) .asset-tile .status-dot {
+  display: none;
+}
