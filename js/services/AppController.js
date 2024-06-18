@@ -3,26 +3,26 @@
  * Manages application lifecycle and UI updates
  */
 
-import { FinnhubTransport } from '../transport/FinnhubTransport.js';
-import { StateManager } from '../core/StateManager.js';
-import { CONFIG } from '../config.js';
-import { logger } from '../utils/Logger.js';
+import { FinnhubTransport } from "../transport/FinnhubTransport.js";
+import { StateManager } from "../core/StateManager.js";
+import { CONFIG } from "../config.js";
+import { logger } from "../utils/Logger.js";
 
-const log = logger.child('App');
+const log = logger.child("App");
 
 export class AppController {
   constructor(assets) {
     this.assets = assets;
-    
+
     // Initialize state manager with assets
     this.state = new StateManager(assets);
-    
+
     // Get API key from localStorage
     const savedApiKey = this._loadApiKey();
-    
+
     // Initialize transport
     this.transport = new FinnhubTransport(savedApiKey, this.state);
-    
+
     // UI state
     this.simulationInterval = null;
     this.tileCache = new Map(); // Cache of DOM elements
@@ -36,18 +36,18 @@ export class AppController {
     // Wire up event handlers
     this._setupEventHandlers();
     this._setupDOMCache();
-    
-    log.info('AppController initialized');
+
+    log.info("AppController initialized");
   }
 
   /**
    * Initialize the application (call after DOM ready)
    */
   init() {
-    log.info('Initializing application...');
+    log.info("Initializing application...");
 
     // Initialize status indicator
-    this._updateStatusIndicator('live', 'Live');
+    this._updateStatusIndicator("live", "Live");
 
     // Display current API key if exists
     const currentKey = this.transport.getApiKey();
@@ -56,7 +56,7 @@ export class AppController {
     }
 
     // Start in simulation mode by default
-    this.setMode('simulation');
+    this.setMode("simulation");
 
     // Setup UI event listeners
     this._setupUIListeners();
@@ -73,7 +73,8 @@ export class AppController {
     const oldMode = this.state.getMode();
 
     // Allow initial setup even if mode is the same
-    const isInitialSetup = oldMode === mode && !this.simulationInterval && !this.transport.isRunning;
+    const isInitialSetup =
+      oldMode === mode && !this.simulationInterval && !this.transport.isRunning;
 
     if (oldMode === mode && !isInitialSetup) {
       log.debug(`Already in ${mode} mode`);
@@ -85,20 +86,20 @@ export class AppController {
     // Update state
     this.state.setMode(mode);
 
-    if (mode === 'real') {
+    if (mode === "real") {
       // Stop simulation
       this._stopSimulation();
 
       // Reset tiles but preserve any previously fetched real data
       this.state.resetAllTiles(true);
-      this._resetPriceHistoryForMode('real');
+      this._resetPriceHistoryForMode("real");
 
       // Initialize fetching progress counter
       this.fetchingTotal = this.assets.length;
       this.fetchingCompleted = 0;
 
       // Start transport
-      const tickers = this.assets.map(a => a.ticker);
+      const tickers = this.assets.map((a) => a.ticker);
       this.transport.start(tickers);
 
       // Update UI
@@ -108,14 +109,13 @@ export class AppController {
       this._updateFetchingProgress(); // Show initial fetching status
 
       // Show toast
-      this._showToast('Real data mode activated');
-
+      this._showToast("Real data mode activated");
     } else {
       // Stop transport
       this.transport.stop();
 
       // Reset tiles to simulation mode (saves real data for later)
-      this._resetPriceHistoryForMode('simulation');
+      this._resetPriceHistoryForMode("simulation");
       this.state.resetAllTiles(false);
 
       // Start simulation
@@ -127,7 +127,7 @@ export class AppController {
       this.paintAll(); // Repaint tiles with placeholder values
 
       // Show toast
-      this._showToast('Simulation mode activated');
+      this._showToast("Simulation mode activated");
     }
   }
 
@@ -139,7 +139,7 @@ export class AppController {
     const tile = this.state.getTile(ticker);
     if (!tile) return;
 
-    const index = this.assets.findIndex(a => a.ticker === ticker);
+    const index = this.assets.findIndex((a) => a.ticker === ticker);
     if (index === -1) return;
 
     const cached = this.tileCache.get(index);
@@ -152,15 +152,15 @@ export class AppController {
       cached.price.textContent = `$${tile.price.toFixed(2)}`;
     } else {
       // No data yet - show placeholder based on mode
-      cached.price.textContent = mode === 'real' ? '---' : '$0.00';
+      cached.price.textContent = mode === "real" ? "---" : "$0.00";
     }
 
     if (tile.change != null) {
-      const changeText = `${tile.change > 0 ? '+' : ''}${tile.change.toFixed(2)}%`;
+      const changeText = `${tile.change > 0 ? "+" : ""}${tile.change.toFixed(2)}%`;
       cached.change.textContent = changeText;
     } else {
       // No data yet - show placeholder based on mode
-      cached.change.textContent = mode === 'real' ? '---' : '0.00%';
+      cached.change.textContent = mode === "real" ? "---" : "0.00%";
     }
 
     // Update tile classes based on change
@@ -188,12 +188,12 @@ export class AppController {
    */
   _setupEventHandlers() {
     // State events
-    this.state.on('tile:updated', ({ ticker }) => {
+    this.state.on("tile:updated", ({ ticker }) => {
       this.paintTile(ticker);
 
       // Track fetching progress in real mode
       const mode = this.state.getMode();
-      if (mode === 'real') {
+      if (mode === "real") {
         this._updateFetchingProgress();
       }
 
@@ -212,36 +212,36 @@ export class AppController {
       }
     });
 
-    this.state.on('tiles:reset', () => {
+    this.state.on("tiles:reset", () => {
       this._renderAllDots();
     });
 
-    this.state.on('market:status', () => {
+    this.state.on("market:status", () => {
       // Market status changed - update all dots
       this._renderAllDots();
     });
 
     // Transport events
-    this.transport.on('started', ({ tickers }) => {
+    this.transport.on("started", ({ tickers }) => {
       // Initialize fetching progress counter
       this.fetchingTotal = tickers.length;
       this.fetchingCompleted = 0;
       this._updateFetchingProgress();
     });
 
-    this.transport.on('ws:connected', () => {
-      log.debug('WebSocket connected');
+    this.transport.on("ws:connected", () => {
+      log.debug("WebSocket connected");
     });
 
-    this.transport.on('ws:disconnected', () => {
-      log.debug('WebSocket disconnected');
+    this.transport.on("ws:disconnected", () => {
+      log.debug("WebSocket disconnected");
     });
 
-    this.transport.on('quote', ({ ticker }) => {
+    this.transport.on("quote", ({ ticker }) => {
       // Quote handled by state manager
       // Update progress if in real mode and still fetching
       const mode = this.state.getMode();
-      if (mode === 'real' && !this.fetchingJustCompleted) {
+      if (mode === "real" && !this.fetchingJustCompleted) {
         this._updateFetchingProgress();
       }
 
@@ -249,19 +249,22 @@ export class AppController {
       this._clearApiKeyInvalidState();
     });
 
-    this.transport.on('rest:rate_limited', (data) => {
+    this.transport.on("rest:rate_limited", (data) => {
       const seconds = Math.ceil(data.backoffDelay / 1000);
       this._showToast(`Rate limited - cooling down for ${seconds}s`);
     });
 
-    this.transport.on('error', (error) => {
-      log.error('Transport error:', error);
+    this.transport.on("error", (error) => {
+      log.error("Transport error:", error);
 
-      if (error.code === 'NO_API_KEY') {
-        this._showToast('API key required - check settings');
+      if (error.code === "NO_API_KEY") {
+        this._showToast("API key required - check settings");
         this._markApiKeyAsInvalid();
-      } else if (error.code === 'AUTH_FAILED' || error.code === 'INVALID_API_KEY') {
-        this._showToast('Invalid API key - check settings');
+      } else if (
+        error.code === "AUTH_FAILED" ||
+        error.code === "INVALID_API_KEY"
+      ) {
+        this._showToast("Invalid API key - check settings");
         this._markApiKeyAsInvalid();
       }
     });
@@ -272,19 +275,19 @@ export class AppController {
    * @private
    */
   _setupDOMCache() {
-    const tiles = document.querySelectorAll('.asset-tile');
-    
+    const tiles = document.querySelectorAll(".asset-tile");
+
     tiles.forEach((tile, index) => {
       this.tileCache.set(index, {
         element: tile,
-        price: tile.querySelector('.price'),
-        change: tile.querySelector('.change'),
-        canvas: tile.querySelector('.sparkline-canvas')
+        price: tile.querySelector(".price"),
+        change: tile.querySelector(".change"),
+        canvas: tile.querySelector(".sparkline-canvas"),
       });
     });
 
     // Seed initial history for simulation placeholders
-    this._resetPriceHistoryForMode('simulation');
+    this._resetPriceHistoryForMode("simulation");
   }
 
   /**
@@ -295,12 +298,12 @@ export class AppController {
   _resetPriceHistoryForMode(mode) {
     this.priceHistory.clear();
 
-    if (mode === 'simulation') {
-      this.assets.forEach(asset => {
+    if (mode === "simulation") {
+      this.assets.forEach((asset) => {
         this.priceHistory.set(asset.ticker, [asset.price]);
       });
     } else {
-      this.assets.forEach(asset => {
+      this.assets.forEach((asset) => {
         this.priceHistory.set(asset.ticker, []);
       });
     }
@@ -312,71 +315,71 @@ export class AppController {
    */
   _setupUIListeners() {
     // Mode toggle
-    const modeToggle = document.getElementById('mode-toggle');
+    const modeToggle = document.getElementById("mode-toggle");
     if (modeToggle) {
-      modeToggle.addEventListener('change', (e) => {
-        this.setMode(e.target.checked ? 'real' : 'simulation');
+      modeToggle.addEventListener("change", (e) => {
+        this.setMode(e.target.checked ? "real" : "simulation");
       });
     }
 
     // API key save
-    const saveBtn = document.getElementById('api-key-save');
-    const input = document.getElementById('api-key-input');
+    const saveBtn = document.getElementById("api-key-save");
+    const input = document.getElementById("api-key-input");
     if (saveBtn && input) {
-      saveBtn.addEventListener('click', () => {
+      saveBtn.addEventListener("click", () => {
         const key = input.value.trim();
         if (!key) {
-          this._showToast('Invalid API key');
+          this._showToast("Invalid API key");
           return;
         }
 
         this._saveApiKey(key);
         this.transport.setApiKey(key);
-        this._showToast('API key saved');
+        this._showToast("API key saved");
 
         // Clear input
-        input.value = '';
+        input.value = "";
 
         // Update masked display and clear invalid state
         this._updateApiKeyDisplay(key);
         this._clearApiKeyInvalidState();
 
         // If in real mode, restart transport to start fetching with new key
-        if (this.state.getMode() === 'real') {
-          log.info('Restarting transport with new API key...');
-          const tickers = this.assets.map(a => a.ticker);
+        if (this.state.getMode() === "real") {
+          log.info("Restarting transport with new API key...");
+          const tickers = this.assets.map((a) => a.ticker);
           this.transport.stop();
 
           // Small delay before restarting
           setTimeout(() => {
             this.transport.start(tickers);
-            this._showToast('Data fetching restarted');
+            this._showToast("Data fetching restarted");
           }, 500);
         }
       });
     }
 
     // API key visibility toggle
-    const visibilityBtn = document.getElementById('api-key-visibility');
-    const copyBtn = document.getElementById('api-key-copy');
-    const displayInput = document.getElementById('api-key-display');
+    const visibilityBtn = document.getElementById("api-key-visibility");
+    const copyBtn = document.getElementById("api-key-copy");
+    const displayInput = document.getElementById("api-key-display");
     if (visibilityBtn && displayInput) {
-      visibilityBtn.addEventListener('click', () => {
-        const isVisible = displayInput.dataset.visibility === 'visible';
+      visibilityBtn.addEventListener("click", () => {
+        const isVisible = displayInput.dataset.visibility === "visible";
         this._setApiKeyVisibility(!isVisible);
       });
     }
 
     if (copyBtn && displayInput) {
-      copyBtn.addEventListener('click', async () => {
-        const key = displayInput.dataset.actual || '';
+      copyBtn.addEventListener("click", async () => {
+        const key = displayInput.dataset.actual || "";
         if (!key) {
-          this._showToast('No API key to copy');
+          this._showToast("No API key to copy");
           return;
         }
 
         const copied = await this._copyApiKey(key);
-        this._showToast(copied ? 'API key copied' : 'Unable to copy API key');
+        this._showToast(copied ? "API key copied" : "Unable to copy API key");
       });
     }
   }
@@ -387,25 +390,31 @@ export class AppController {
    */
   _updateTileClasses(element, change) {
     const thresholds = CONFIG.UI.THRESHOLDS;
-    const previousState = element.dataset.state || 'neutral';
+    const previousState = element.dataset.state || "neutral";
 
     // Remove all state classes
-    element.classList.remove('gaining', 'gaining-strong', 'losing', 'losing-strong', 'neutral');
+    element.classList.remove(
+      "gaining",
+      "gaining-strong",
+      "losing",
+      "losing-strong",
+      "neutral",
+    );
 
     // If no data yet (change is null), keep neutral
-    let nextState = 'neutral';
+    let nextState = "neutral";
 
     // Add appropriate class based on change
     if (change == null) {
-      nextState = 'neutral';
+      nextState = "neutral";
     } else if (change > thresholds.STRONG_GAIN) {
-      nextState = 'gaining-strong';
+      nextState = "gaining-strong";
     } else if (change > thresholds.MILD_GAIN) {
-      nextState = 'gaining';
+      nextState = "gaining";
     } else if (change < thresholds.STRONG_LOSS) {
-      nextState = 'losing-strong';
+      nextState = "losing-strong";
     } else if (change < thresholds.MILD_LOSS) {
-      nextState = 'losing';
+      nextState = "losing";
     }
 
     element.classList.add(nextState);
@@ -427,13 +436,13 @@ export class AppController {
       clearTimeout(element._stateChangeTimeout);
     }
 
-    element.classList.remove('tile-state-change');
+    element.classList.remove("tile-state-change");
     // Force reflow so animation can retrigger
     void element.offsetWidth;
-    element.classList.add('tile-state-change');
+    element.classList.add("tile-state-change");
 
     element._stateChangeTimeout = setTimeout(() => {
-      element.classList.remove('tile-state-change');
+      element.classList.remove("tile-state-change");
       element._stateChangeTimeout = null;
     }, 450);
   }
@@ -443,21 +452,21 @@ export class AppController {
    * @private
    */
   _updateDotState(element, ticker) {
-    const dot = element.querySelector('.status-dot');
+    const dot = element.querySelector(".status-dot");
     if (!dot) return;
 
     // Get deterministic dot state from transport
     const state = this.transport.computeDotState(ticker);
 
     // Remove all state classes
-    dot.classList.remove('standby', 'open', 'closed', 'pulsing');
+    dot.classList.remove("standby", "open", "closed", "pulsing");
 
     // Add state class
     dot.classList.add(state);
 
     // Add pulsing for open markets
-    if (state === 'open') {
-      dot.classList.add('pulsing');
+    if (state === "open") {
+      dot.classList.add("pulsing");
     }
   }
 
@@ -482,11 +491,26 @@ export class AppController {
     const history = this.priceHistory.get(ticker) || [];
     if (history.length < 2) return;
 
-    const ctx = canvas.getContext('2d');
-    const width = canvas.width;
-    const height = canvas.height;
+    const ctx = canvas.getContext("2d");
+    const dpr = window.devicePixelRatio || 1;
+    const logicalWidth =
+      canvas.clientWidth || canvas.offsetWidth || canvas.width;
+    const logicalHeight =
+      canvas.clientHeight || canvas.offsetHeight || canvas.height;
+    const scaledWidth = Math.round(logicalWidth * dpr);
+    const scaledHeight = Math.round(logicalHeight * dpr);
 
-    ctx.clearRect(0, 0, width, height);
+    if (canvas.width !== scaledWidth || canvas.height !== scaledHeight) {
+      canvas.width = scaledWidth;
+      canvas.height = scaledHeight;
+      canvas.style.width = `${logicalWidth}px`;
+      canvas.style.height = `${logicalHeight}px`;
+    }
+
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.scale(dpr, dpr);
+
+    ctx.clearRect(0, 0, logicalWidth, logicalHeight);
 
     const min = Math.min(...history);
     const max = Math.max(...history);
@@ -495,17 +519,25 @@ export class AppController {
     // Use the tile's change percentage for color, not local trend
     const tile = this.state.getTile(ticker);
     const change = tile && tile.change != null ? tile.change : 0;
+    const isPositive = change >= 0;
+    const strokeColor = isPositive ? "#1cc16b" : "#ef4444";
 
-    ctx.strokeStyle = change >= 0 ? '#10b981' : '#ef4444';
     ctx.lineWidth = 2;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = strokeColor;
+    ctx.shadowColor = isPositive
+      ? "rgba(28, 193, 107, 0.35)"
+      : "rgba(239, 68, 68, 0.3)";
+    ctx.shadowBlur = 4;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
     ctx.beginPath();
 
     history.forEach((price, i) => {
-      const x = (i / (history.length - 1)) * width;
-      const y = height - ((price - min) / range) * height;
-      
+      const x = (i / (history.length - 1)) * logicalWidth;
+      const y = logicalHeight - ((price - min) / range) * logicalHeight;
+
       if (i === 0) {
         ctx.moveTo(x, y);
       } else {
@@ -514,6 +546,36 @@ export class AppController {
     });
 
     ctx.stroke();
+
+    // Reset shadow for subsequent draws
+    ctx.shadowBlur = 0;
+    ctx.shadowColor = "transparent";
+  }
+
+  /**
+   * Adjust simulation update frequency and restart loop if needed
+   * @param {number} ms
+   */
+  setSimulationFrequency(ms) {
+    const parsed = Number.parseInt(ms, 10);
+    if (Number.isNaN(parsed) || parsed <= 0) {
+      return;
+    }
+
+    const clamped = Math.max(100, parsed);
+    CONFIG.UI.UPDATE_FREQUENCY = clamped;
+
+    if (this.state.getMode() !== "simulation") {
+      return;
+    }
+
+    if (this.simulationInterval) {
+      clearInterval(this.simulationInterval);
+      this.simulationInterval = null;
+    }
+
+    this._startSimulation();
+    log.info(`Simulation update frequency set to ${clamped}ms`);
   }
 
   /**
@@ -523,7 +585,7 @@ export class AppController {
   _startSimulation() {
     if (this.simulationInterval) return;
 
-    log.info('Starting simulation...');
+    log.info("Starting simulation...");
 
     this.simulationInterval = setInterval(() => {
       this._updateSimulation();
@@ -538,7 +600,7 @@ export class AppController {
     if (this.simulationInterval) {
       clearInterval(this.simulationInterval);
       this.simulationInterval = null;
-      log.info('Simulation stopped');
+      log.info("Simulation stopped");
     }
   }
 
@@ -562,9 +624,10 @@ export class AppController {
       // Simulate realistic price movements
       const momentum = Math.sin(Date.now() / 10000 + index) * 0.3;
       const randomFactor = (Math.random() - 0.5) * 2;
-      const volatility = (CONFIG.UI.VOLATILITY.BASE +
-                         Math.sin(Date.now() / 5000) * CONFIG.UI.VOLATILITY.AMPLITUDE) *
-                         CONFIG.UI.VOLATILITY.USER_MULTIPLIER;
+      const volatility =
+        (CONFIG.UI.VOLATILITY.BASE +
+          Math.sin(Date.now() / 5000) * CONFIG.UI.VOLATILITY.AMPLITUDE) *
+        CONFIG.UI.VOLATILITY.USER_MULTIPLIER;
 
       const changeAmount = (momentum + randomFactor) * volatility;
       tile.change += changeAmount;
@@ -585,7 +648,8 @@ export class AppController {
         tile.previousClose = tile._placeholderBasePrice;
       }
 
-      tile.high = tile.high != null ? Math.max(tile.high, tile.price) : tile.price;
+      tile.high =
+        tile.high != null ? Math.max(tile.high, tile.price) : tile.price;
       tile.low = tile.low != null ? Math.min(tile.low, tile.price) : tile.price;
       tile.volume = (tile.volume || 0) + Math.abs(changeAmount) * 850;
       tile.volume = Math.min(tile.volume, 5000000);
@@ -606,7 +670,7 @@ export class AppController {
       this.paintTile(asset.ticker);
 
       // Emit tile updated event for stats
-      this.state.emit('tile:updated', { ticker: asset.ticker });
+      this.state.emit("tile:updated", { ticker: asset.ticker });
     });
   }
 
@@ -624,48 +688,47 @@ export class AppController {
    */
   _updateModeIndicators() {
     const mode = this.state.getMode();
-    const label = document.getElementById('mode-toggle-label');
-    const toggle = document.getElementById('mode-toggle');
-    const caption = document.getElementById('mode-toggle-caption');
+    const label = document.getElementById("mode-toggle-label");
+    const toggle = document.getElementById("mode-toggle");
+    const caption = document.getElementById("mode-toggle-caption");
 
     if (label) {
-      label.textContent = mode === 'real' ? 'Real Data' : 'Simulation';
+      label.textContent = mode === "real" ? "Real Data" : "Simulation";
     }
 
     if (caption) {
-      caption.textContent = mode === 'real'
-        ? 'Live market stream enabled'
-        : 'Simulation Active';
+      caption.textContent =
+        mode === "real" ? "Live market stream enabled" : "Simulation Active";
     }
 
     if (toggle) {
-      toggle.checked = mode === 'real';
+      toggle.checked = mode === "real";
     }
 
-    document.body.classList.toggle('real-mode', mode === 'real');
+    document.body.classList.toggle("real-mode", mode === "real");
   }
 
   /**
    * Update status indicator (unified Live/Fetching display)
    * @private
    */
-  _updateStatusIndicator(mode = 'live', message = null) {
-    const el = document.getElementById('status-indicator');
+  _updateStatusIndicator(mode = "live", message = null) {
+    const el = document.getElementById("status-indicator");
     if (!el) return;
 
-    const dotEl = el.querySelector('.status-dot');
-    const textEl = el.querySelector('.status-text');
+    const dotEl = el.querySelector(".status-dot");
+    const textEl = el.querySelector(".status-text");
     if (!dotEl || !textEl) return;
 
-    el.classList.remove('fetching');
+    el.classList.remove("fetching");
 
     switch (mode) {
-      case 'fetching':
-        el.classList.add('fetching');
-        textEl.textContent = message || 'Fetching...';
+      case "fetching":
+        el.classList.add("fetching");
+        textEl.textContent = message || "Fetching...";
         break;
-      case 'live':
-        textEl.textContent = message || 'Live';
+      case "live":
+        textEl.textContent = message || "Live";
         break;
     }
   }
@@ -684,17 +747,23 @@ export class AppController {
 
     // If less than 1 minute, show time
     if (minutes < 1) {
-      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      return date.toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
     }
 
     // If same day, show time
     if (days === 0) {
-      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      return date.toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
     }
 
     // If yesterday
     if (days === 1) {
-      return `Yesterday ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+      return `Yesterday ${date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
     }
 
     // If 2-3 days ago
@@ -707,7 +776,7 @@ export class AppController {
     }
 
     // If older, show compact date
-    return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    return date.toLocaleDateString([], { month: "short", day: "numeric" });
   }
 
   /**
@@ -716,11 +785,11 @@ export class AppController {
    */
   _updateFetchingProgress() {
     const mode = this.state.getMode();
-    if (mode !== 'real') return;
+    if (mode !== "real") return;
 
     // Count tiles with COMPLETE data (price AND change)
     let tilesWithData = 0;
-    this.state.getAllTiles().forEach(tile => {
+    this.state.getAllTiles().forEach((tile) => {
       if (tile.hasInfo && tile.price != null && tile.change != null) {
         tilesWithData++;
       }
@@ -732,13 +801,16 @@ export class AppController {
       // All data fetched - show Live with timestamp
       const now = new Date();
       const timeStr = this._formatRelativeTime(now);
-      this._updateStatusIndicator('live', `Live | Last Update: ${timeStr}`);
+      this._updateStatusIndicator("live", `Live | Last Update: ${timeStr}`);
 
       // Mark fetching as complete
       this.fetchingJustCompleted = true;
     } else {
       // Still fetching - show progress with spinner
-      this._updateStatusIndicator('fetching', `Fetching (${this.fetchingCompleted}/${this.fetchingTotal})`);
+      this._updateStatusIndicator(
+        "fetching",
+        `Fetching (${this.fetchingCompleted}/${this.fetchingTotal})`,
+      );
       this.fetchingJustCompleted = false;
     }
   }
@@ -748,14 +820,14 @@ export class AppController {
    * @private
    */
   _showToast(message, duration = 2500) {
-    const toast = document.getElementById('toast');
+    const toast = document.getElementById("toast");
     if (!toast) return;
 
     toast.textContent = message;
-    toast.classList.add('show');
+    toast.classList.add("show");
 
     setTimeout(() => {
-      toast.classList.remove('show');
+      toast.classList.remove("show");
     }, duration);
   }
 
@@ -769,21 +841,23 @@ export class AppController {
       const savedKey = localStorage.getItem(CONFIG.API_KEY.STORAGE_KEY);
 
       if (savedKey && savedKey.trim()) {
-        log.info('Loaded API key from localStorage');
+        log.info("Loaded API key from localStorage");
         return savedKey;
       }
 
       // Fallback to default key from config
       if (CONFIG.API_KEY.DEFAULT) {
-        log.info('Using default API key from config.js');
+        log.info("Using default API key from config.js");
         return CONFIG.API_KEY.DEFAULT;
       }
 
-      log.warn('No API key available (neither in storage nor in config)');
-      return '';
+      log.warn("No API key available (neither in storage nor in config)");
+      return "";
     } catch (e) {
-      log.warn('Failed to load API key from localStorage, using config fallback');
-      return CONFIG.API_KEY.DEFAULT || '';
+      log.warn(
+        "Failed to load API key from localStorage, using config fallback",
+      );
+      return CONFIG.API_KEY.DEFAULT || "";
     }
   }
 
@@ -794,9 +868,9 @@ export class AppController {
   _saveApiKey(key) {
     try {
       localStorage.setItem(CONFIG.API_KEY.STORAGE_KEY, key);
-      log.info('API key saved to localStorage');
+      log.info("API key saved to localStorage");
     } catch (e) {
-      log.error('Failed to save API key to localStorage');
+      log.error("Failed to save API key to localStorage");
     }
   }
 
@@ -805,16 +879,16 @@ export class AppController {
    * @private
    */
   _updateApiKeyDisplay(key) {
-    const display = document.getElementById('api-key-display');
+    const display = document.getElementById("api-key-display");
     if (!display) return;
 
-    const actualKey = key || '';
+    const actualKey = key || "";
     display.dataset.actual = actualKey;
     if (!display.dataset.visibility) {
-      display.dataset.visibility = 'masked';
+      display.dataset.visibility = "masked";
     }
 
-    const isVisible = display.dataset.visibility === 'visible';
+    const isVisible = display.dataset.visibility === "visible";
     display.value = isVisible ? actualKey : this._maskKey(actualKey);
 
     this._syncApiKeyControls(actualKey);
@@ -825,11 +899,11 @@ export class AppController {
    * @private
    */
   _maskKey(key) {
-    if (!key) return '';
-    if (key.length <= 10) return '•'.repeat(Math.max(0, key.length));
+    if (!key) return "";
+    if (key.length <= 10) return "•".repeat(Math.max(0, key.length));
     const visible = key.slice(-10);
     const hiddenCount = Math.max(0, key.length - visible.length);
-    return '•'.repeat(hiddenCount) + visible;
+    return "•".repeat(hiddenCount) + visible;
   }
 
   /**
@@ -838,11 +912,11 @@ export class AppController {
    * @param {boolean} shouldShow
    */
   _setApiKeyVisibility(shouldShow) {
-    const display = document.getElementById('api-key-display');
+    const display = document.getElementById("api-key-display");
     if (!display) return;
 
-    const key = display.dataset.actual || '';
-    display.dataset.visibility = shouldShow ? 'visible' : 'masked';
+    const key = display.dataset.actual || "";
+    display.dataset.visibility = shouldShow ? "visible" : "masked";
     display.value = shouldShow ? key : this._maskKey(key);
 
     this._syncApiKeyControls(key);
@@ -855,15 +929,15 @@ export class AppController {
    */
   _syncApiKeyControls(key) {
     const hasKey = Boolean(key);
-    const visibilityBtn = document.getElementById('api-key-visibility');
-    const copyBtn = document.getElementById('api-key-copy');
-    const display = document.getElementById('api-key-display');
-    const isVisible = display?.dataset.visibility === 'visible';
+    const visibilityBtn = document.getElementById("api-key-visibility");
+    const copyBtn = document.getElementById("api-key-copy");
+    const display = document.getElementById("api-key-display");
+    const isVisible = display?.dataset.visibility === "visible";
 
     if (visibilityBtn) {
       visibilityBtn.disabled = !hasKey;
-      visibilityBtn.textContent = isVisible ? 'Hide' : 'Show';
-      visibilityBtn.setAttribute('aria-pressed', isVisible ? 'true' : 'false');
+      visibilityBtn.textContent = isVisible ? "Hide" : "Show";
+      visibilityBtn.setAttribute("aria-pressed", isVisible ? "true" : "false");
     }
 
     if (copyBtn) {
@@ -881,23 +955,27 @@ export class AppController {
     if (!key) return false;
 
     try {
-      if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+      if (
+        navigator.clipboard &&
+        typeof navigator.clipboard.writeText === "function"
+      ) {
         await navigator.clipboard.writeText(key);
         return true;
       }
 
-      const textarea = document.createElement('textarea');
+      const textarea = document.createElement("textarea");
       textarea.value = key;
-      textarea.setAttribute('readonly', '');
-      textarea.style.position = 'absolute';
-      textarea.style.left = '-9999px';
+      textarea.setAttribute("readonly", "");
+      textarea.style.position = "absolute";
+      textarea.style.left = "-9999px";
       document.body.appendChild(textarea);
 
       const selection = document.getSelection();
-      const selectedRange = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+      const selectedRange =
+        selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
 
       textarea.select();
-      const success = document.execCommand('copy');
+      const success = document.execCommand("copy");
       document.body.removeChild(textarea);
 
       if (selectedRange && selection) {
@@ -906,12 +984,12 @@ export class AppController {
       }
 
       if (!success) {
-        throw new Error('execCommand copy failed');
+        throw new Error("execCommand copy failed");
       }
 
       return true;
     } catch (err) {
-      log.warn('Failed to copy API key', err);
+      log.warn("Failed to copy API key", err);
       return false;
     }
   }
@@ -921,9 +999,9 @@ export class AppController {
    * @private
    */
   _markApiKeyAsInvalid() {
-    const displayInput = document.getElementById('api-key-display');
+    const displayInput = document.getElementById("api-key-display");
     if (displayInput) {
-      displayInput.classList.add('invalid');
+      displayInput.classList.add("invalid");
     }
   }
 
@@ -932,9 +1010,9 @@ export class AppController {
    * @private
    */
   _clearApiKeyInvalidState() {
-    const displayInput = document.getElementById('api-key-display');
+    const displayInput = document.getElementById("api-key-display");
     if (displayInput) {
-      displayInput.classList.remove('invalid');
+      displayInput.classList.remove("invalid");
     }
   }
 
@@ -946,7 +1024,7 @@ export class AppController {
     return {
       mode: this.state.getMode(),
       transport: this.transport.getStatus(),
-      tiles: this.state.getAllTiles().size
+      tiles: this.state.getAllTiles().size,
     };
   }
 }

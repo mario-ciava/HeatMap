@@ -64,8 +64,9 @@
 }
 
 .add-tile:hover .add-tile-icon {
-  color: rgba(147, 197, 253, 0.85);
-  transform: rotate(90deg) scale(1.1);
+  color: rgba(147, 197, 253, 0.95);
+  transform: scale(1.15);
+  text-shadow: 0 8px 22px rgba(96, 165, 250, 0.35);
 }
 
 .add-tile-text {
@@ -139,16 +140,16 @@
   cursor: pointer;
   transform-style: preserve-3d;
   overflow: hidden;
-  --tile-hover-lift: 10px;
+  --tile-hover-lift: 6px;
   --tile-hover-brightness: 1.08;
   --tile-hover-saturation: 1.05;
-  --tile-color-1: #2a2a2a;
-  --tile-color-2: #1a1a1a;
+  --tile-color-1: var(--tile-neutral-1, #2a2a2a);
+  --tile-color-2: var(--tile-neutral-2, #1a1a1a);
   transition:
-    transform 0.4s var(--ease-standard),
-    filter 0.6s ease,
-    box-shadow 0.4s ease,
-    background 0.6s ease;
+    transform 0.35s var(--ease-standard),
+    filter 0.75s var(--ease-smooth),
+    box-shadow 0.75s var(--ease-smooth),
+    background 0.75s var(--ease-smooth);
   will-change: transform, filter, box-shadow;
 }
 
@@ -159,8 +160,8 @@
 .asset-tile.tile-state-change {
   opacity: 0.95;
   box-shadow:
-    0 24px 48px rgba(59, 130, 246, 0.3),
-    0 0 0 1px rgba(59, 130, 246, 0.22),
+    0 24px 48px var(--tile-glow-ring-outer-color, rgba(59, 130, 246, 0.3)),
+    0 0 0 1px var(--tile-glow-ring-border-color, rgba(59, 130, 246, 0.22)),
     0 30px 60px rgba(0, 0, 0, 0.45);
 }
 
@@ -221,7 +222,7 @@
     transparent
   );
   transform: rotate(45deg) translateX(-100%);
-  transition: transform 0.6s ease;
+  transition: transform 0.6s var(--ease-smooth);
 }
 
 .asset-tile:hover::after {
@@ -231,31 +232,23 @@
 .asset-tile.gaining {
   --tile-color-1: var(--gain-medium);
   --tile-color-2: var(--gain-high);
-  --tile-hover-lift: 0px;
-  --tile-hover-brightness: 1.08;
-  --tile-hover-saturation: 1.05;
   filter: brightness(var(--thermal-intensity)) saturate(1.3);
   animation: pulse 2s ease-in-out infinite;
+  box-shadow: 0 0 32px var(--tile-glow-positive-soft, rgba(255, 74, 46, 0.25));
 }
 
 .asset-tile.gaining-strong {
   --tile-color-1: var(--gain-high);
   --tile-color-2: var(--gain-extreme);
-  --tile-hover-lift: 0px;
-  --tile-hover-brightness: 1.08;
-  --tile-hover-saturation: 1.05;
   filter: brightness(calc(var(--thermal-intensity) * 1.25)) saturate(1.5)
     hue-rotate(-10deg);
   animation: pulseFast 1s ease-in-out infinite;
-  box-shadow: 0 0 35px rgba(255, 42, 30, 0.6);
+  box-shadow: 0 0 42px var(--tile-glow-positive-strong, rgba(255, 74, 46, 0.55));
 }
 
 .asset-tile.losing {
   --tile-color-1: var(--loss-medium);
   --tile-color-2: var(--loss-high);
-  --tile-hover-lift: 0px;
-  --tile-hover-brightness: 1.08;
-  --tile-hover-saturation: 1.05;
   filter: brightness(calc(var(--thermal-intensity) * 0.85)) saturate(0.9);
   animation: breathe 3s ease-in-out infinite;
 }
@@ -263,9 +256,6 @@
 .asset-tile.losing-strong {
   --tile-color-1: var(--loss-extreme);
   --tile-color-2: var(--loss-high);
-  --tile-hover-lift: 0px;
-  --tile-hover-brightness: 1.08;
-  --tile-hover-saturation: 1.05;
   filter: brightness(calc(var(--thermal-intensity) * 0.65)) saturate(0.7)
     hue-rotate(20deg);
   animation: breatheSlow 4s ease-in-out infinite;
@@ -273,16 +263,33 @@
 }
 
 .asset-tile.neutral {
-  --tile-color-1: #3a3a3a;
-  --tile-color-2: #252525;
-  --tile-hover-lift: 0px;
-  --tile-hover-brightness: 1.02;
-  --tile-hover-saturation: 1;
-  filter: brightness(0.9) saturate(0.7);
+  --tile-color-1: var(--tile-neutral-1, #3a3a3a);
+  --tile-color-2: var(--tile-neutral-2, #252525);
+  filter: brightness(var(--tile-neutral-brightness, 0.9))
+    saturate(var(--tile-neutral-saturation, 0.75));
+}
+
+/* Monochrome theme fine-tuning */
+body[data-theme="monochrome"] .asset-tile.neutral {
+  --tile-color-1: #f6f7fb;
+  --tile-color-2: #dfe3ea;
+  filter: brightness(1) saturate(0.24);
+}
+
+body[data-theme="monochrome"] .asset-tile.losing {
+  --tile-color-1: #c0c5ce;
+  --tile-color-2: #a6aeb9;
+  filter: brightness(0.78) saturate(0.18);
+}
+
+body[data-theme="monochrome"] .asset-tile.losing-strong {
+  --tile-color-1: #9aa1ac;
+  --tile-color-2: #858d99;
+  filter: brightness(0.65) saturate(0.14);
 }
 
 .asset-tile:hover {
-  transform: translateY(calc(-1 * var(--tile-hover-lift))) scale(1.02);
+  transform: translateY(calc(-1 * var(--tile-hover-lift))) scale(1.015);
   z-index: 10;
   box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5);
   filter: brightness(var(--tile-hover-brightness, 1.08))
@@ -307,12 +314,24 @@
   margin-bottom: 4px;
 }
 
+body[data-theme="monochrome"] .asset-tile.gaining .ticker,
+body[data-theme="monochrome"] .asset-tile.gaining-strong .ticker {
+  color: #111827;
+  text-shadow: 0 2px 4px rgba(255, 255, 255, 0.6);
+}
+
 .price {
   font-size: 1.12rem;
   font-weight: 700;
   color: rgba(255, 255, 255, 0.98);
   letter-spacing: -0.3px;
   text-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+body[data-theme="monochrome"] .asset-tile.gaining .price,
+body[data-theme="monochrome"] .asset-tile.gaining-strong .price {
+  color: #0f172a;
+  text-shadow: 0 2px 6px rgba(255, 255, 255, 0.45);
 }
 
 .change {
