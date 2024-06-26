@@ -32,11 +32,11 @@
     rgba(31, 41, 55, 0.96) 0%,
     rgba(17, 24, 39, 0.94) 100%
   );
-  border: 1px solid rgba(59, 130, 246, 0.22);
+  border: 1px solid var(--accent-border-medium);
   border-radius: 18px;
   box-shadow:
     0 30px 70px rgba(0, 0, 0, 0.55),
-    0 0 0 1px rgba(59, 130, 246, 0.12) inset;
+    0 0 0 1px rgba(248, 113, 113, 0.12) inset;
   backdrop-filter: blur(28px);
   animation: modalFloat 0.5s var(--ease-overshoot);
   scroll-behavior: smooth;
@@ -64,14 +64,14 @@
 
 .modal-content::-webkit-scrollbar-thumb,
 .add-ticker-modal::-webkit-scrollbar-thumb {
-  background: rgba(59, 130, 246, 0.45);
+  background: rgba(248, 113, 113, 0.45);
   border-radius: 10px;
   transition: background 0.3s ease;
 }
 
 .modal-content::-webkit-scrollbar-thumb:hover,
 .add-ticker-modal::-webkit-scrollbar-thumb:hover {
-  background: rgba(59, 130, 246, 0.65);
+  background: rgba(251, 146, 60, 0.65);
 }
 
 .modal-close {
@@ -242,8 +242,8 @@
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  background: #3b82f6;
-  box-shadow: 0 0 12px rgba(59, 130, 246, 0.4);
+  background: #fb923c;
+  box-shadow: 0 0 12px rgba(251, 146, 60, 0.4);
   opacity: 0;
   transition: opacity 0.15s ease;
   left: -9999px;
@@ -259,7 +259,7 @@
   padding: 6px 12px;
   border-radius: 8px;
   background: rgba(15, 23, 42, 0.88);
-  border: 1px solid rgba(59, 130, 246, 0.25);
+  border: 1px solid rgba(248, 113, 113, 0.25);
   font-size: 0.75rem;
   font-weight: 600;
   color: var(--text-primary);
@@ -295,7 +295,7 @@
     rgba(20, 26, 36, 0.95) 100%
   );
   backdrop-filter: blur(15px);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid var(--accent-border-medium);
   border-radius: 50%;
   color: var(--text-primary);
   cursor: pointer;
@@ -311,18 +311,18 @@
 
 .theme-btn:hover {
   transform: rotate(180deg) scale(1.15);
-  border-color: rgba(59, 130, 246, 0.7);
+  border-color: var(--accent-border-strong);
   background: linear-gradient(
     135deg,
-    rgba(59, 130, 246, 0.3) 0%,
-    rgba(59, 130, 246, 0.15) 100%
+    var(--accent-glow-medium) 0%,
+    var(--accent-glow-soft) 100%
   );
-  box-shadow: 0 8px 24px rgba(59, 130, 246, 0.4);
+  box-shadow: 0 8px 24px var(--accent-glow-strong);
 }
 
 .theme-btn:active {
   transform: rotate(180deg) scale(1.05);
-  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3);
+  box-shadow: 0 4px 16px var(--accent-glow-medium);
 }
 
 /* Toast Notification */
@@ -337,7 +337,7 @@
     rgba(20, 26, 36, 0.98) 100%
   );
   backdrop-filter: blur(20px);
-  border: 1px solid rgba(59, 130, 246, 0.3);
+  border: 1px solid rgba(248, 113, 113, 0.3);
   border-radius: 12px;
   padding: 18px 32px;
   color: var(--text-primary);
@@ -346,7 +346,7 @@
   transition: all 0.5s var(--ease-bounce);
   box-shadow:
     0 16px 40px rgba(0, 0, 0, 0.6),
-    0 0 0 1px rgba(59, 130, 246, 0.2) inset;
+    0 0 0 1px rgba(248, 113, 113, 0.2) inset;
   font-weight: 700;
   font-size: 0.94rem;
   letter-spacing: 0.5px;
@@ -367,7 +367,7 @@
   animation: fadeInUp 0.8s ease-out 0.6s both;
   max-height: 500px;
   opacity: 1;
-  overflow: hidden;
+  overflow: visible;
   transition:
     max-height 0.6s var(--ease-standard),
     opacity 0.5s var(--ease-standard),
@@ -377,13 +377,8 @@
 
 .control-btn {
   padding: 14px 28px;
-  background: linear-gradient(
-    135deg,
-    rgba(31, 41, 55, 0.95) 0%,
-    rgba(20, 26, 36, 0.95) 100%
-  );
-  backdrop-filter: blur(15px);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: var(--panel-card-bg);
+  border: 1px solid var(--panel-border);
   border-radius: 12px;
   color: var(--text-primary);
   cursor: pointer;
@@ -391,23 +386,29 @@
   font-size: 0.92rem;
   font-weight: 700;
   letter-spacing: 0.5px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  box-shadow:
+    0 6px 16px rgba(8, 12, 24, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .control-btn:hover {
-  background: linear-gradient(
-    135deg,
-    rgba(59, 130, 246, 0.4) 0%,
-    rgba(59, 130, 246, 0.25) 100%
-  );
-  border-color: rgba(59, 130, 246, 0.7);
+  background:
+    linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.12) 0%,
+      rgba(255, 255, 255, 0.02) 100%
+    ),
+    var(--panel-card-bg);
+  border-color: rgba(255, 255, 255, 0.24);
   transform: translateY(-3px);
-  box-shadow: 0 8px 20px rgba(59, 130, 246, 0.3);
+  box-shadow:
+    0 12px 26px rgba(8, 12, 24, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 .control-btn:active {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
+  box-shadow: 0 6px 16px rgba(8, 12, 24, 0.3);
   transition:
     transform 0.1s ease,
     box-shadow 0.1s ease;
@@ -439,7 +440,7 @@
   margin-bottom: 24px;
   padding: 20px;
   border-radius: 15px;
-  border: 1px solid rgba(59, 130, 246, 0.2);
+  border: 1px solid var(--accent-border-medium);
   background: linear-gradient(
     135deg,
     rgba(31, 41, 55, 0.8) 0%,
@@ -447,7 +448,7 @@
   );
   box-shadow:
     0 10px 40px rgba(0, 0, 0, 0.4),
-    0 0 0 1px rgba(59, 130, 246, 0.15) inset;
+    0 0 0 1px var(--accent-glow-soft) inset;
   animation: fadeIn 1s ease-out 0.3s both;
 }
 
@@ -583,17 +584,17 @@
 .add-ticker-field button:hover {
   background: linear-gradient(
     135deg,
-    rgba(59, 130, 246, 0.4) 0%,
-    rgba(59, 130, 246, 0.25) 100%
+    rgba(248, 113, 113, 0.4) 0%,
+    rgba(251, 146, 60, 0.25) 100%
   );
-  border-color: rgba(59, 130, 246, 0.7);
+  border-color: rgba(251, 146, 60, 0.7);
   transform: translateY(-3px);
-  box-shadow: 0 8px 20px rgba(59, 130, 246, 0.3);
+  box-shadow: 0 8px 20px rgba(251, 146, 60, 0.3);
 }
 
 .add-ticker-field button:active {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
+  box-shadow: 0 4px 12px rgba(251, 146, 60, 0.25);
   transition:
     transform 0.1s ease,
     box-shadow 0.1s ease;

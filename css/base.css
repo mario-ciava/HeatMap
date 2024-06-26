@@ -29,12 +29,12 @@ body::before {
   background:
     radial-gradient(
       circle at 20% 50%,
-      rgba(59, 130, 246, 0.1) 0%,
+      var(--accent-glow-soft) 0%,
       transparent 50%
     ),
     radial-gradient(
       circle at 80% 50%,
-      rgba(239, 68, 68, 0.1) 0%,
+      var(--accent-glow-medium) 0%,
       transparent 50%
     );
   pointer-events: none;
@@ -53,11 +53,7 @@ body::before {
   margin-bottom: 30px;
   animation: fadeInDown 0.8s ease-out;
   padding: 20px;
-  background: linear-gradient(
-    180deg,
-    rgba(31, 41, 55, 0.3) 0%,
-    transparent 100%
-  );
+  background: transparent;
   border-radius: 20px;
 }
 
@@ -66,11 +62,11 @@ body::before {
   font-weight: 300;
   letter-spacing: -0.5px;
   margin-bottom: 10px;
-  background: linear-gradient(135deg, #3b82f6 0%, #ef4444 100%);
+  background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 50%, var(--accent-tertiary) 100%);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
-  text-shadow: 0 4px 20px rgba(59, 130, 246, 0.3);
+  text-shadow: 0 4px 20px rgba(248, 113, 113, 0.3);
 }
 
 .subtitle {

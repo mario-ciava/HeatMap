@@ -2,7 +2,7 @@
 .add-tile {
   position: relative;
   aspect-ratio: 1;
-  border: 1px solid rgba(96, 165, 250, 0.15);
+  border: 1px solid var(--accent-border-subtle);
   background: linear-gradient(
     135deg,
     rgba(15, 23, 42, 0.4) 0%,
@@ -29,7 +29,7 @@
   bottom: 0;
   background: radial-gradient(
     circle at center,
-    rgba(59, 130, 246, 0.05),
+    rgba(248, 113, 113, 0.05),
     transparent 70%
   );
   opacity: 0;
@@ -39,10 +39,10 @@
 }
 
 .add-tile:hover {
-  border-color: rgba(96, 165, 250, 0.35);
+  border-color: var(--accent-glow-medium);
   box-shadow:
     0 8px 24px rgba(0, 0, 0, 0.3),
-    0 0 0 1px rgba(59, 130, 246, 0.1) inset;
+    0 0 0 1px var(--accent-glow-soft) inset;
   transform: scale(1.02);
 }
 
@@ -56,7 +56,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: rgba(96, 165, 250, 0.6);
+  color: var(--accent-primary);
   font-size: 2.5rem;
   font-weight: 200;
   line-height: 1;
@@ -64,9 +64,9 @@
 }
 
 .add-tile:hover .add-tile-icon {
-  color: rgba(147, 197, 253, 0.95);
+  color: var(--accent-tertiary);
   transform: scale(1.15);
-  text-shadow: 0 8px 22px rgba(96, 165, 250, 0.35);
+  text-shadow: 0 8px 22px var(--accent-glow-medium);
 }
 
 .add-tile-text {
@@ -82,12 +82,12 @@
   font-weight: 700;
   letter-spacing: 1.5px;
   text-transform: uppercase;
-  color: #93c5fd;
+  color: var(--accent-secondary);
   transition: color 0.3s ease;
 }
 
 .add-tile:hover .add-tile-title {
-  color: #bfdbfe;
+  color: var(--accent-tertiary);
 }
 
 .add-tile-subtitle {
@@ -110,7 +110,7 @@
   gap: 4px;
   padding: 24px;
   border-radius: 15px;
-  border: 1px solid rgba(59, 130, 246, 0.2);
+  border: 1px solid var(--accent-border-medium);
   background: linear-gradient(
     135deg,
     rgba(31, 41, 55, 0.8) 0%,
@@ -118,7 +118,7 @@
   );
   box-shadow:
     0 10px 40px rgba(0, 0, 0, 0.4),
-    0 0 0 1px rgba(59, 130, 246, 0.15) inset;
+    0 0 0 1px var(--accent-glow-soft) inset;
   position: relative;
   animation: fadeIn 1s ease-out 0.4s both;
 }
@@ -160,8 +160,8 @@
 .asset-tile.tile-state-change {
   opacity: 0.95;
   box-shadow:
-    0 24px 48px var(--tile-glow-ring-outer-color, rgba(59, 130, 246, 0.3)),
-    0 0 0 1px var(--tile-glow-ring-border-color, rgba(59, 130, 246, 0.22)),
+    0 24px 48px var(--tile-glow-ring-outer-color, rgba(248, 113, 113, 0.3)),
+    0 0 0 1px var(--tile-glow-ring-border-color, rgba(248, 113, 113, 0.22)),
     0 30px 60px rgba(0, 0, 0, 0.45);
 }
 
