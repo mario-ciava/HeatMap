@@ -819,7 +819,7 @@ export class AppController {
    * Show toast notification
    * @private
    */
-  _showToast(message, duration = 2500) {
+  _showToast(message, duration = 6500) {
     const toast = document.getElementById("toast");
     if (!toast) return;
 

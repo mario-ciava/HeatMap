@@ -6,7 +6,7 @@
   right: 0;
   bottom: 0;
   background: rgba(0, 0, 0, 0.65);
-  backdrop-filter: blur(3px);
+  backdrop-filter: blur(2.7px);
   display: none;
   align-items: center;
   justify-content: center;
@@ -27,16 +27,21 @@
   overflow-y: auto;
   overflow-x: hidden;
   scrollbar-gutter: stable;
-  background: linear-gradient(
+  /* background: linear-gradient(
     135deg,
     rgba(31, 41, 55, 0.96) 0%,
     rgba(17, 24, 39, 0.94) 100%
-  );
+  ); */
+  /* background: var(--panel-card-bg); */
+  background:
+    radial-gradient(120% 160% at 15% 5%, rgba(255, 255, 255, 0.08), transparent 60%),
+    radial-gradient(140% 200% at 85% 10%, var(--accent-glow-soft), transparent 65%),
+    linear-gradient(135deg, rgba(31, 41, 55, 0.82) 0%, rgba(20, 26, 36, 0.78) 100%);
   border: 1px solid var(--accent-border-medium);
   border-radius: 18px;
   box-shadow:
     0 30px 70px rgba(0, 0, 0, 0.55),
-    0 0 0 1px rgba(248, 113, 113, 0.12) inset;
+    0 0 0 1px var(--accent-glow-soft) inset;
   backdrop-filter: blur(28px);
   animation: modalFloat 0.5s var(--ease-overshoot);
   scroll-behavior: smooth;
@@ -64,14 +69,14 @@
 
 .modal-content::-webkit-scrollbar-thumb,
 .add-ticker-modal::-webkit-scrollbar-thumb {
-  background: rgba(248, 113, 113, 0.45);
+  background: var(--accent-glow-medium);
   border-radius: 10px;
   transition: background 0.3s ease;
 }
 
 .modal-content::-webkit-scrollbar-thumb:hover,
 .add-ticker-modal::-webkit-scrollbar-thumb:hover {
-  background: rgba(251, 146, 60, 0.65);
+  background: var(--accent-glow-strong);
 }
 
 .modal-close {
@@ -103,7 +108,12 @@
   font-size: 2.2rem;
   font-weight: 700;
   margin-bottom: 8px;
-  background: linear-gradient(135deg, #3b82f6 0%, #ef4444 100%);
+  background: linear-gradient(
+    135deg,
+    var(--accent-primary) 0%,
+    var(--accent-secondary) 50%,
+    var(--accent-tertiary) 100%
+  );
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -130,15 +140,25 @@
   align-items: flex-start;
   gap: 6px;
   padding: 14px 18px;
-  background: rgba(255, 255, 255, 0.04);
+  background:
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.06), transparent 55%),
+    linear-gradient(135deg, rgba(31, 41, 55, 0.82) 0%, rgba(20, 26, 36, 0.82) 100%),
+    var(--panel-field-bg);
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--panel-field-border);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.16);
   transition: all 0.3s ease;
 }
 
 .detail-row:hover {
-  background: rgba(255, 255, 255, 0.07);
-  border-color: rgba(255, 255, 255, 0.1);
+  background:
+    radial-gradient(circle at top left, var(--accent-glow-soft), transparent 60%),
+    linear-gradient(135deg, rgba(31, 41, 55, 0.88) 0%, rgba(20, 26, 36, 0.9) 100%),
+    var(--panel-field-bg);
+  border-color: var(--panel-field-border-hover);
+  box-shadow:
+    0 10px 22px rgba(0, 0, 0, 0.28),
+    0 0 0 1px rgba(255, 255, 255, 0.02) inset;
   transform: translateY(-1px);
 }
 
@@ -159,8 +179,11 @@
 .modal-chart-container {
   margin-top: 24px;
   padding: 20px;
-  background: var(--panel-card-bg);
-  border: 1px solid var(--panel-border);
+  background:
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.08), transparent 60%),
+    linear-gradient(135deg, rgba(31, 41, 55, 0.82) 0%, rgba(20, 26, 36, 0.82) 100%),
+    var(--panel-card-bg);
+  border: 1px solid var(--panel-field-border);
   border-radius: 14px;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
@@ -337,7 +360,7 @@
     rgba(20, 26, 36, 0.98) 100%
   );
   backdrop-filter: blur(20px);
-  border: 1px solid rgba(248, 113, 113, 0.3);
+  border: 1px solid var(--accent-border-medium);
   border-radius: 12px;
   padding: 18px 32px;
   color: var(--text-primary);
@@ -346,7 +369,7 @@
   transition: all 0.5s var(--ease-bounce);
   box-shadow:
     0 16px 40px rgba(0, 0, 0, 0.6),
-    0 0 0 1px rgba(248, 113, 113, 0.2) inset;
+    0 0 0 1px var(--accent-glow-soft) inset;
   font-weight: 700;
   font-size: 0.94rem;
   letter-spacing: 0.5px;
@@ -377,8 +400,13 @@
 
 .control-btn {
   padding: 14px 28px;
-  background: var(--panel-card-bg);
-  border: 1px solid var(--panel-border);
+  background: linear-gradient(
+    135deg,
+    var(--accent-primary) 0%,
+    var(--accent-secondary) 60%,
+    var(--accent-tertiary) 100%
+  );
+  border: 1px solid var(--accent-border-strong);
   border-radius: 12px;
   color: var(--text-primary);
   cursor: pointer;
@@ -387,28 +415,26 @@
   font-weight: 700;
   letter-spacing: 0.5px;
   box-shadow:
-    0 6px 16px rgba(8, 12, 24, 0.28),
-    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    0 10px 26px rgba(0, 0, 0, 0.3);
 }
 
 .control-btn:hover {
-  background:
-    linear-gradient(
-      135deg,
-      rgba(255, 255, 255, 0.12) 0%,
-      rgba(255, 255, 255, 0.02) 100%
-    ),
-    var(--panel-card-bg);
-  border-color: rgba(255, 255, 255, 0.24);
+  background: linear-gradient(
+    135deg,
+    var(--accent-secondary) 0%,
+    var(--accent-tertiary) 70%,
+    rgba(255, 255, 255, 0.35) 100%
+  );
+  border-color: var(--accent-glow-strong);
   transform: translateY(-3px);
   box-shadow:
-    0 12px 26px rgba(8, 12, 24, 0.32),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    0 14px 32px rgba(0, 0, 0, 0.35),
+    0 0 0 1px rgba(255, 255, 255, 0.08) inset;
 }
 
 .control-btn:active {
   transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(8, 12, 24, 0.3);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.28);
   transition:
     transform 0.1s ease,
     box-shadow 0.1s ease;
@@ -450,6 +476,18 @@
     0 10px 40px rgba(0, 0, 0, 0.4),
     0 0 0 1px var(--accent-glow-soft) inset;
   animation: fadeIn 1s ease-out 0.3s both;
+  transition:
+    transform 0.4s var(--ease-smooth),
+    box-shadow 0.4s var(--ease-smooth),
+    border-color 0.4s var(--ease-smooth);
+}
+
+.stats-bar:hover {
+  border-color: var(--accent-glow-soft);
+  box-shadow:
+    0 14px 44px rgba(0, 0, 0, 0.42),
+    0 0 0 1px var(--accent-glow-medium) inset;
+  transform: translateY(-4px);
 }
 
 .stat {
@@ -490,7 +528,7 @@
   font-size: 2.2rem;
   font-weight: 700;
   margin-bottom: 8px;
-  background: linear-gradient(135deg, #3b82f6 0%, #ef4444 100%);
+  background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 50%, var(--accent-tertiary) 100%);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -531,7 +569,9 @@
 .add-ticker-field input {
   flex: 1;
   padding: 14px 18px;
-  background: var(--panel-field-bg);
+  background:
+    linear-gradient(135deg, rgba(31, 41, 55, 0.82) 0%, rgba(20, 26, 36, 0.82) 100%),
+    var(--panel-field-bg);
   backdrop-filter: blur(10px);
   border: 1px solid var(--panel-field-border);
   border-radius: 12px;
@@ -550,26 +590,38 @@
 
 .add-ticker-field input:hover {
   border-color: var(--panel-field-border-hover);
-  background: rgba(15, 23, 42, 0.76);
+  background:
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.08), transparent 60%),
+    linear-gradient(135deg, rgba(31, 41, 55, 0.86) 0%, rgba(20, 26, 36, 0.86) 100%),
+    var(--panel-field-bg);
+  box-shadow:
+    0 8px 18px rgba(0, 0, 0, 0.24),
+    0 0 0 1px rgba(255, 255, 255, 0.02) inset,
+    0 0 0 1px rgba(255, 255, 255, 0.05);
 }
 
 .add-ticker-field input:focus {
   outline: none;
   border-color: var(--panel-field-border-hover);
-  background: rgba(15, 23, 42, 0.86);
-  box-shadow: var(--panel-focus-ring), var(--panel-field-shadow-soft);
+  background:
+    radial-gradient(circle at top left, var(--accent-glow-soft), transparent 60%),
+    linear-gradient(135deg, rgba(31, 41, 55, 0.9) 0%, rgba(20, 26, 36, 0.9) 100%),
+    var(--panel-field-bg);
+  box-shadow:
+    0 0 0 3px var(--accent-glow-soft),
+    0 10px 24px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(255, 255, 255, 0.02) inset;
   transform: translateY(-2px);
 }
 
 .add-ticker-field button {
   padding: 14px 28px;
-  background: linear-gradient(
-    135deg,
-    rgba(31, 41, 55, 0.95) 0%,
-    rgba(20, 26, 36, 0.95) 100%
-  );
+  background:
+    linear-gradient(135deg, rgba(31, 41, 55, 0.85), rgba(20, 26, 36, 0.82)),
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.05), transparent 60%),
+    var(--panel-card-bg);
   backdrop-filter: blur(15px);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid var(--accent-border-medium);
   border-radius: 12px;
   color: var(--text-primary);
   cursor: pointer;
@@ -577,24 +629,26 @@
   font-size: 0.92rem;
   font-weight: 700;
   letter-spacing: 0.5px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.2),
+    0 0 0 1px rgba(255, 255, 255, 0.02) inset;
   white-space: nowrap;
 }
 
 .add-ticker-field button:hover {
-  background: linear-gradient(
-    135deg,
-    rgba(248, 113, 113, 0.4) 0%,
-    rgba(251, 146, 60, 0.25) 100%
-  );
-  border-color: rgba(251, 146, 60, 0.7);
+  background:
+    linear-gradient(135deg, var(--accent-glow-medium) 0%, rgba(255, 255, 255, 0.08) 100%),
+    var(--panel-card-bg);
+  border-color: var(--accent-glow-medium);
   transform: translateY(-3px);
-  box-shadow: 0 8px 20px rgba(251, 146, 60, 0.3);
+  box-shadow:
+    0 10px 26px rgba(0, 0, 0, 0.28),
+    0 0 0 1px rgba(255, 255, 255, 0.02) inset;
 }
 
 .add-ticker-field button:active {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(251, 146, 60, 0.25);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.22);
   transition:
     transform 0.1s ease,
     box-shadow 0.1s ease;
@@ -603,8 +657,10 @@
 .add-ticker-results {
   min-height: 200px;
   padding: 20px;
-  background: var(--panel-card-bg);
-  border: 1px solid var(--panel-border);
+  background:
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.06), transparent 55%),
+    var(--panel-card-bg);
+  border: 1px solid var(--accent-border-medium);
   border-radius: 14px;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
   color: var(--text-primary);

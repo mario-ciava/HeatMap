@@ -6,11 +6,13 @@
 
 body {
   font-family: "SF Mono", Monaco, "Cascadia Code", monospace;
-  background: linear-gradient(
-    135deg,
-    var(--bg-primary) 0%,
-    var(--bg-secondary) 100%
-  );
+  background:
+    radial-gradient(
+      circle at center,
+      var(--bg-secondary) 0%,
+      var(--bg-primary) 55%,
+      rgba(6, 10, 18, 0.94) 100%
+    );
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -28,14 +30,19 @@ body::before {
   inset: 0;
   background:
     radial-gradient(
+      circle at center,
+      rgba(255, 255, 255, 0.03) 0%,
+      transparent 55%
+    ),
+    radial-gradient(
       circle at 20% 50%,
       var(--accent-glow-soft) 0%,
-      transparent 50%
+      transparent 60%
     ),
     radial-gradient(
       circle at 80% 50%,
-      var(--accent-glow-medium) 0%,
-      transparent 50%
+      var(--accent-glow-soft) 0%,
+      transparent 60%
     );
   pointer-events: none;
   animation: ambientGlow 10s ease-in-out infinite;
@@ -66,7 +73,7 @@ body::before {
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
-  text-shadow: 0 4px 20px rgba(248, 113, 113, 0.3);
+  text-shadow: none;
 }
 
 .subtitle {
