@@ -5,8 +5,8 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.65);
-  backdrop-filter: blur(2.7px);
+  background: rgba(0, 0, 0, 0.58);
+  backdrop-filter: blur(2.4px);
   display: none;
   align-items: center;
   justify-content: center;
@@ -53,6 +53,11 @@
 
 .add-ticker-modal {
   max-width: 640px;
+  background:
+    radial-gradient(120% 160% at 15% 5%, rgba(255, 255, 255, 0.04), transparent 50%),
+    radial-gradient(140% 200% at 85% 10%, var(--accent-glow-soft), transparent 60%),
+    linear-gradient(135deg, rgba(31, 41, 55, 0.94) 0%, rgba(20, 26, 36, 0.92) 100%);
+  backdrop-filter: blur(12px);
 }
 
 .modal-content::-webkit-scrollbar,
@@ -383,7 +388,7 @@
 .controls {
   position: fixed;
   bottom: 32px;
-  right: 32px;
+  right: max(2.5%, calc((100vw - 1400px) / 2 + 32px));
   display: flex;
   gap: 14px;
   z-index: 100;
@@ -402,42 +407,66 @@
   padding: 14px 28px;
   background: linear-gradient(
     135deg,
-    var(--accent-primary) 0%,
-    var(--accent-secondary) 60%,
-    var(--accent-tertiary) 100%
+    rgba(31, 41, 55, 0.8) 0%,
+    rgba(20, 26, 36, 0.8) 100%
   );
-  border: 1px solid var(--accent-border-strong);
-  border-radius: 12px;
+  backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid var(--accent-border-medium);
+  border-radius: 16px;
   color: var(--text-primary);
   cursor: pointer;
-  transition: all 0.4s var(--ease-standard);
+  transition: all 0.4s var(--ease-smooth);
   font-size: 0.92rem;
   font-weight: 700;
   letter-spacing: 0.5px;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
   box-shadow:
-    0 10px 26px rgba(0, 0, 0, 0.3);
+    0 10px 28px rgba(0, 0, 0, 0.35),
+    0 0 0 1px var(--accent-glow-soft) inset;
+  position: relative;
+  overflow: hidden;
 }
 
 .control-btn:hover {
   background: linear-gradient(
     135deg,
-    var(--accent-secondary) 0%,
-    var(--accent-tertiary) 70%,
-    rgba(255, 255, 255, 0.35) 100%
+    rgba(31, 41, 55, 0.9) 0%,
+    rgba(20, 26, 36, 0.9) 100%
   );
-  border-color: var(--accent-glow-strong);
-  transform: translateY(-3px);
+  border-color: var(--accent-glow-medium);
+  transform: translateY(-4px);
   box-shadow:
-    0 14px 32px rgba(0, 0, 0, 0.35),
-    0 0 0 1px rgba(255, 255, 255, 0.08) inset;
+    0 16px 40px rgba(0, 0, 0, 0.4),
+    0 0 0 1px var(--accent-glow-medium) inset,
+    0 0 20px var(--accent-glow-soft);
 }
 
 .control-btn:active {
-  transform: translateY(-1px);
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.28);
+  transform: translateY(-2px);
+  box-shadow:
+    0 10px 24px rgba(0, 0, 0, 0.32),
+    0 0 0 1px var(--accent-glow-soft) inset;
   transition:
     transform 0.1s ease,
     box-shadow 0.1s ease;
+}
+
+.control-btn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    circle at 50% 0%,
+    var(--accent-glow-soft) 0%,
+    transparent 70%
+  );
+  opacity: 0.4;
+  pointer-events: none;
+  transition: opacity 0.4s var(--ease-smooth);
+}
+
+.control-btn:hover::before {
+  opacity: 0.7;
 }
 
 /* Thermal wave effect */
@@ -570,17 +599,18 @@
   flex: 1;
   padding: 14px 18px;
   background:
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.08), transparent 60%),
     linear-gradient(135deg, rgba(31, 41, 55, 0.82) 0%, rgba(20, 26, 36, 0.82) 100%),
-    var(--panel-field-bg);
+    var(--panel-card-bg);
   backdrop-filter: blur(10px);
   border: 1px solid var(--panel-field-border);
-  border-radius: 12px;
+  border-radius: 14px;
   color: var(--text-primary);
   font-size: 0.92rem;
   font-weight: 500;
   font-family: inherit;
   transition: all 0.4s var(--ease-standard);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
 .add-ticker-field input::placeholder {
@@ -591,27 +621,22 @@
 .add-ticker-field input:hover {
   border-color: var(--panel-field-border-hover);
   background:
-    radial-gradient(circle at top left, rgba(255, 255, 255, 0.08), transparent 60%),
-    linear-gradient(135deg, rgba(31, 41, 55, 0.86) 0%, rgba(20, 26, 36, 0.86) 100%),
-    var(--panel-field-bg);
-  box-shadow:
-    0 8px 18px rgba(0, 0, 0, 0.24),
-    0 0 0 1px rgba(255, 255, 255, 0.02) inset,
-    0 0 0 1px rgba(255, 255, 255, 0.05);
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.10), transparent 60%),
+    linear-gradient(135deg, rgba(31, 41, 55, 0.82) 0%, rgba(20, 26, 36, 0.82) 100%),
+    var(--panel-card-bg);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
 .add-ticker-field input:focus {
   outline: none;
   border-color: var(--panel-field-border-hover);
   background:
-    radial-gradient(circle at top left, var(--accent-glow-soft), transparent 60%),
-    linear-gradient(135deg, rgba(31, 41, 55, 0.9) 0%, rgba(20, 26, 36, 0.9) 100%),
-    var(--panel-field-bg);
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.12), transparent 60%),
+    linear-gradient(135deg, rgba(31, 41, 55, 0.82) 0%, rgba(20, 26, 36, 0.82) 100%),
+    var(--panel-card-bg);
   box-shadow:
-    0 0 0 3px var(--accent-glow-soft),
-    0 10px 24px rgba(0, 0, 0, 0.3),
-    0 0 0 1px rgba(255, 255, 255, 0.02) inset;
-  transform: translateY(-2px);
+    0 0 0 1px var(--panel-field-border-hover),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
 .add-ticker-field button {
@@ -658,9 +683,10 @@
   min-height: 200px;
   padding: 20px;
   background:
-    radial-gradient(circle at top left, rgba(255, 255, 255, 0.06), transparent 55%),
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.08), transparent 60%),
+    linear-gradient(135deg, rgba(31, 41, 55, 0.82) 0%, rgba(20, 26, 36, 0.82) 100%),
     var(--panel-card-bg);
-  border: 1px solid var(--accent-border-medium);
+  border: 1px solid var(--panel-field-border);
   border-radius: 14px;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
   color: var(--text-primary);

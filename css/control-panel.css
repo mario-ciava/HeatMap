@@ -16,7 +16,7 @@
   box-shadow:
     0 10px 40px rgba(0, 0, 0, 0.4),
     0 0 0 1px var(--accent-glow-soft) inset;
-  overflow: visible;
+  overflow: hidden;
   position: relative;
   transition: all 0.5s var(--ease-smooth);
 }
@@ -24,26 +24,22 @@
 .control-panel::before {
   content: "";
   position: absolute;
-  top: 1px;
-  left: 14px;
-  right: 14px;
-  height: 2px;
+  top: 0;
+  left: 8px;
+  right: 8px;
+  height: 5px;
   border-radius: 999px;
-  background:
-    radial-gradient(50% 120% at 0% 50%, rgba(255, 255, 255, 0.45), transparent 70%) 0 0 / 14px 100% no-repeat,
-    radial-gradient(50% 120% at 100% 50%, rgba(255, 255, 255, 0.45), transparent 70%) 100% 0 / 14px 100% no-repeat,
-    linear-gradient(
-      90deg,
-      rgba(255, 255, 255, 0) 0%,
-      rgba(255, 255, 255, 0.35) 18%,
-      var(--accent-secondary) 48%,
-      rgba(255, 255, 255, 0.35) 82%,
-      rgba(255, 255, 255, 0) 100%
-    );
-  background-size: 14px 100%, 14px 100%, 180% 100%;
-  background-repeat: no-repeat;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.4) 25%,
+    var(--accent-secondary) 50%,
+    rgba(255, 255, 255, 0.4) 75%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
   animation: shimmerLine 3.2s cubic-bezier(0.42, 0, 0.58, 1) infinite;
-  box-shadow: 0 0 14px rgba(255, 255, 255, 0.22);
+  box-shadow: 0 0 18px rgba(255, 255, 255, 0.4);
   z-index: 2;
 }
 
@@ -71,16 +67,16 @@
 
 @keyframes shimmerLine {
   0% {
-    opacity: 0.45;
-    background-position: 14px 0, calc(100% - 14px) 0, 130% 0;
+    opacity: 0.6;
+    background-position: -100% 0;
   }
   50% {
     opacity: 1;
-    background-position: 14px 0, calc(100% - 14px) 0, -10% 0;
+    background-position: 0% 0;
   }
   100% {
-    opacity: 0.45;
-    background-position: 14px 0, calc(100% - 14px) 0, -130% 0;
+    opacity: 0.6;
+    background-position: 100% 0;
   }
 }
 

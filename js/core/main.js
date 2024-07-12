@@ -827,9 +827,10 @@ function initHeatmap() {
   app = new AppController(assets);
   app.init();
 
-  // Listen for tile updates to refresh statistics
+  // Listen for tile updates to refresh statistics and modal
   app.state.on("tile:updated", () => {
     updateStats();
+    updateModalIfOpen();
   });
 
   // Setup remaining UI features
@@ -1147,7 +1148,11 @@ function setupKeyboardShortcuts() {
 // Modal Functions
 // ============================================================================
 
+// Track currently displayed asset in modal for live updates
+let currentModalAssetIndex = null;
+
 function showAssetDetails(index) {
+  currentModalAssetIndex = index;
   const asset = assets[index];
   const tileState = app.state.getTile(asset.ticker);
   const history = app.priceHistory.get(asset.ticker) || [];
@@ -1264,10 +1269,129 @@ function showAssetDetails(index) {
 }
 
 function closeModal() {
+  currentModalAssetIndex = null;
   const modal = document.getElementById("modal");
   modal.classList.remove("active");
   document.documentElement.style.overflow = "";
   resetChartOverlays();
+}
+
+/**
+ * Update modal content if it's currently open
+ * Called during live updates to keep modal data fresh
+ */
+function updateModalIfOpen() {
+  if (currentModalAssetIndex === null) return;
+
+  const modal = document.getElementById("modal");
+  if (!modal || !modal.classList.contains("active")) {
+    currentModalAssetIndex = null;
+    return;
+  }
+
+  // Refresh modal content without re-opening animation
+  const asset = assets[currentModalAssetIndex];
+  if (!asset) return;
+
+  const tileState = app.state.getTile(asset.ticker);
+  const history = app.priceHistory.get(asset.ticker) || [];
+  const mode = app.state.getMode();
+
+  const currentPrice =
+    tileState?.price ?? (mode === "simulation" ? asset.price : null);
+  const currentChange =
+    tileState?.change ?? (mode === "simulation" ? asset.change : null);
+
+  const detailRows = [];
+  const addRow = (label, value, options = {}) => {
+    const safeValue = value ?? "---";
+    const styleAttr = options.color ? ` style="color: ${options.color}"` : "";
+    detailRows.push(`
+      <div class="detail-row">
+        <span class="detail-label">${label}</span>
+        <span class="detail-value"${styleAttr}>${safeValue}</span>
+      </div>
+    `);
+  };
+
+  addRow("Current Price", formatPrice(currentPrice));
+
+  const changeColor =
+    currentChange > 0 ? "#10b981" : currentChange < 0 ? "#ef4444" : null;
+  const changeDisplay =
+    currentChange != null ? formatPercent(currentChange) : "---";
+  addRow(
+    "Change",
+    changeDisplay,
+    changeColor ? { color: changeColor } : undefined,
+  );
+
+  if (mode === "simulation") {
+    const firstPrice = history.length ? history[0] : asset.basePrice;
+    let sessionChange = null;
+    if (currentPrice != null && firstPrice != null && firstPrice !== 0) {
+      sessionChange = ((currentPrice - firstPrice) / firstPrice) * 100;
+    }
+    const sessionColor =
+      sessionChange > 0 ? "#10b981" : sessionChange < 0 ? "#ef4444" : null;
+    addRow(
+      "Session Total",
+      formatPercent(sessionChange),
+      sessionColor ? { color: sessionColor } : undefined,
+    );
+  }
+
+  addRow("Sector", asset.sector);
+
+  const chartHistory = history.length
+    ? [...history]
+    : currentPrice != null
+      ? [currentPrice]
+      : [];
+
+  const openValue =
+    mode === "real"
+      ? tileState?.open
+      : (chartHistory[0] ?? tileState?._placeholderPrice ?? asset.price);
+
+  const previousCloseValue =
+    mode === "real"
+      ? (tileState?.previousClose ?? tileState?.basePrice)
+      : (tileState?.previousClose ??
+        tileState?._placeholderBasePrice ??
+        asset.basePrice);
+
+  const highValue =
+    mode === "real"
+      ? tileState?.high
+      : chartHistory.length
+        ? Math.max(...chartHistory)
+        : openValue;
+
+  const lowValue =
+    mode === "real"
+      ? tileState?.low
+      : chartHistory.length
+        ? Math.min(...chartHistory)
+        : openValue;
+
+  const volumeValue = tileState?.volume;
+  const lastTradeLabel =
+    mode === "real"
+      ? formatRelativeTime(tileState?.lastTradeTs)
+      : "Simulated feed";
+
+  addRow("Open", formatPrice(openValue));
+  addRow("Previous Close", formatPrice(previousCloseValue));
+  addRow("Day High", formatPrice(highValue));
+  addRow("Day Low", formatPrice(lowValue));
+  addRow("Volume", formatVolume(volumeValue));
+  addRow("Last Trade", lastTradeLabel);
+
+  document.getElementById("modal-details").innerHTML = detailRows.join("");
+
+  // Update chart
+  drawModalChart(chartHistory);
 }
 
 function drawModalChart(history) {
@@ -1458,7 +1582,22 @@ function attachModalChartInteractions(canvas) {
 // ============================================================================
 
 function toggleAnimation() {
-  showToast("Use mode toggle to switch between simulation and real data");
+  const mode = app.state.getMode();
+
+  if (mode !== "simulation") {
+    showToast("Animation controls only work in Simulation mode");
+    return;
+  }
+
+  const isRunning = app.isSimulationRunning();
+
+  if (isRunning) {
+    app.pauseSimulation();
+    showToast("⏸️ Animation paused");
+  } else {
+    app.resumeSimulation();
+    showToast("▶️ Animation resumed");
+  }
 }
 
 function simulateMarketCrash() {

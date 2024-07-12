@@ -117,6 +117,9 @@ export class AppController {
       // Reset tiles to simulation mode (saves real data for later)
       this._resetPriceHistoryForMode("simulation");
       this.state.resetAllTiles(false);
+      this.fetchingTotal = 0;
+      this.fetchingCompleted = 0;
+      this.fetchingJustCompleted = false;
 
       // Start simulation
       this._startSimulation();
@@ -125,6 +128,7 @@ export class AppController {
       this._updateModeIndicators();
       this._renderAllDots();
       this.paintAll(); // Repaint tiles with placeholder values
+      this._updateStatusIndicator("live", "Live");
 
       // Show toast
       this._showToast("Simulation mode activated");
@@ -516,20 +520,47 @@ export class AppController {
     const max = Math.max(...history);
     const range = max - min || 1;
 
-    // Use the tile's change percentage for color, not local trend
-    const tile = this.state.getTile(ticker);
-    const change = tile && tile.change != null ? tile.change : 0;
-    const isPositive = change >= 0;
-    const strokeColor = isPositive ? "#1cc16b" : "#ef4444";
+    // Determine the sparkline color from the tile's displayed state/percent change
+    const tileElement = canvas.closest(".asset-tile");
+    let tileState = tileElement?.dataset.state || "";
 
-    ctx.lineWidth = 2;
+    const tile = this.state.getTile(ticker);
+    let change = tile && tile.change != null ? tile.change : null;
+    if (change != null && typeof change !== "number") {
+      const parsed = Number.parseFloat(change);
+      change = Number.isNaN(parsed) ? null : parsed;
+    }
+
+    let trend = null;
+    if (tileState === "gaining" || tileState === "gaining-strong") {
+      trend = "up";
+    } else if (tileState === "losing" || tileState === "losing-strong") {
+      trend = "down";
+    } else if (change != null) {
+      if (change > 0.0001) trend = "up";
+      else if (change < -0.0001) trend = "down";
+    }
+
+    let strokeColor = "#1cc16b";
+    if (trend === "down") {
+      strokeColor = "#ef4444";
+    } else if (trend === null) {
+      strokeColor = "rgba(226, 232, 240, 0.85)";
+    }
+
+    const lineThickness = Math.max(2, logicalHeight / 14);
+    ctx.lineWidth = lineThickness;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
     ctx.strokeStyle = strokeColor;
-    ctx.shadowColor = isPositive
-      ? "rgba(28, 193, 107, 0.35)"
-      : "rgba(239, 68, 68, 0.3)";
-    ctx.shadowBlur = 4;
+    let shadowColor = "rgba(28, 193, 107, 0.35)";
+    if (trend === "down") {
+      shadowColor = "rgba(239, 68, 68, 0.3)";
+    } else if (trend === null) {
+      shadowColor = "rgba(148, 163, 184, 0.35)";
+    }
+    ctx.shadowColor = shadowColor;
+    ctx.shadowBlur = Math.min(8, lineThickness * 2.2);
     ctx.shadowOffsetX = 0;
     ctx.shadowOffsetY = 0;
     ctx.beginPath();
@@ -576,6 +607,54 @@ export class AppController {
 
     this._startSimulation();
     log.info(`Simulation update frequency set to ${clamped}ms`);
+  }
+
+  /**
+   * Pause simulation updates
+   * @returns {boolean} true if paused, false if already paused or not in simulation mode
+   */
+  pauseSimulation() {
+    if (this.state.getMode() !== "simulation") {
+      log.debug("Cannot pause - not in simulation mode");
+      return false;
+    }
+
+    if (!this.simulationInterval) {
+      log.debug("Simulation already paused");
+      return false;
+    }
+
+    this._stopSimulation();
+    log.info("Simulation paused");
+    return true;
+  }
+
+  /**
+   * Resume simulation updates
+   * @returns {boolean} true if resumed, false if already running or not in simulation mode
+   */
+  resumeSimulation() {
+    if (this.state.getMode() !== "simulation") {
+      log.debug("Cannot resume - not in simulation mode");
+      return false;
+    }
+
+    if (this.simulationInterval) {
+      log.debug("Simulation already running");
+      return false;
+    }
+
+    this._startSimulation();
+    log.info("Simulation resumed");
+    return true;
+  }
+
+  /**
+   * Check if simulation is currently running
+   * @returns {boolean}
+   */
+  isSimulationRunning() {
+    return this.state.getMode() === "simulation" && this.simulationInterval !== null;
   }
 
   /**

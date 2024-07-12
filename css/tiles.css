@@ -367,6 +367,82 @@ body[data-theme="monochrome"] .asset-tile.gaining-strong .price {
   content: "▲";
 }
 
+@supports (container-type: inline-size) {
+  .asset-tile {
+    container: asset-card / inline-size;
+  }
+
+  @container asset-card (min-width: 180px) {
+    .ticker {
+      font-size: 0.95rem;
+      letter-spacing: 1px;
+      margin-bottom: 6px;
+    }
+
+    .price {
+      font-size: 1.28rem;
+    }
+
+    .change {
+      font-size: 0.98rem;
+      padding: 6px 12px;
+    }
+
+    .sparkline-canvas {
+      height: 36px;
+    }
+
+    .add-tile-icon {
+      width: 56px;
+      height: 56px;
+      font-size: 2.8rem;
+    }
+
+    .add-tile-title {
+      font-size: 0.95rem;
+      letter-spacing: 1.6px;
+    }
+
+    .add-tile-subtitle {
+      font-size: 0.78rem;
+    }
+  }
+
+  @container asset-card (min-width: 220px) {
+    .ticker {
+      font-size: 1.08rem;
+      margin-bottom: 8px;
+    }
+
+    .price {
+      font-size: 1.45rem;
+    }
+
+    .change {
+      font-size: 1.08rem;
+      padding: 7px 14px;
+    }
+
+    .sparkline-canvas {
+      height: 44px;
+    }
+
+    .add-tile-icon {
+      width: 64px;
+      height: 64px;
+      font-size: 3.1rem;
+    }
+
+    .add-tile-title {
+      font-size: 1.05rem;
+    }
+
+    .add-tile-subtitle {
+      font-size: 0.85rem;
+    }
+  }
+}
+
 @media (max-width: 768px) {
   .heatmap-grid {
     grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
