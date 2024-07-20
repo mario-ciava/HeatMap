@@ -7,8 +7,17 @@ import { FinnhubTransport } from "../transport/FinnhubTransport.js";
 import { StateManager } from "../core/StateManager.js";
 import { CONFIG } from "../config.js";
 import { logger } from "../utils/Logger.js";
+import { perfMonitor } from "../utils/PerfMonitor.js";
 
 const log = logger.child("App");
+const isPerfEnabled = () =>
+  typeof window === "undefined" || window.__heatmapPerfEnabled !== false;
+const perfStart = (label) => (isPerfEnabled() ? perfMonitor.start(label) : null);
+const perfEnd = (id, weight) => {
+  if (id != null) {
+    perfMonitor.end(id, weight);
+  }
+};
 
 export class AppController {
   constructor(assets) {
@@ -25,7 +34,7 @@ export class AppController {
 
     // UI state
     this.simulationInterval = null;
-    this.tileCache = new Map(); // Cache of DOM elements
+    this.tileCache = new Map(); // Cache of DOM elements + metadata
     this.priceHistory = new Map(); // Price history for sparklines
 
     // Fetching progress tracking
@@ -139,51 +148,121 @@ export class AppController {
    * Update a single tile's visual representation
    * @param {string} ticker
    */
-  paintTile(ticker) {
+  paintTile(ticker, indexHint = undefined) {
     const tile = this.state.getTile(ticker);
     if (!tile) return;
 
-    const index = this.assets.findIndex((a) => a.ticker === ticker);
+    const index =
+      typeof indexHint === "number" ? indexHint : this.assets.findIndex((a) => a.ticker === ticker);
     if (index === -1) return;
 
     const cached = this.tileCache.get(index);
     if (!cached) return;
 
+    if (tile.dirty === false && cached.lastTileState === cached.element.dataset.state) {
+      return;
+    }
+
+    const perfId = perfStart("paintTile");
     const mode = this.state.getMode();
 
-    // Update price and change text
-    if (tile.price != null) {
-      cached.price.textContent = `$${tile.price.toFixed(2)}`;
-    } else {
-      // No data yet - show placeholder based on mode
-      cached.price.textContent = mode === "real" ? "---" : "$0.00";
+    try {
+      let priceChanged = false;
+
+      // Update price and change text
+      if (cached.price) {
+        if (tile.price != null) {
+          const priceValue = tile.price;
+          const priceText = `$${priceValue.toFixed(2)}`;
+          if (cached.lastPriceValue !== priceValue) {
+            priceChanged = true;
+          }
+          if (cached.lastPriceText !== priceText) {
+            cached.price.textContent = priceText;
+            cached.lastPriceText = priceText;
+          }
+          cached.lastPriceValue = priceValue;
+        } else {
+          if (cached.lastPriceValue != null) {
+            priceChanged = true;
+          }
+          const placeholder = mode === "real" ? "---" : "$0.00";
+          if (cached.lastPriceText !== placeholder) {
+            cached.price.textContent = placeholder;
+            cached.lastPriceText = placeholder;
+          }
+          cached.lastPriceValue = null;
+        }
+      } else {
+        // No price element (defensive)
+        cached.lastPriceValue = tile.price ?? null;
+      }
+
+      if (cached.change) {
+        if (tile.change != null) {
+          const changeValue = tile.change;
+          const changeText = `${changeValue > 0 ? "+" : ""}${changeValue.toFixed(2)}%`;
+          if (cached.lastChangeText !== changeText) {
+            cached.change.textContent = changeText;
+            cached.lastChangeText = changeText;
+          }
+          cached.lastChangeValue = changeValue;
+        } else {
+          const placeholder = mode === "real" ? "---" : "0.00%";
+          if (cached.lastChangeText !== placeholder) {
+            cached.change.textContent = placeholder;
+            cached.lastChangeText = placeholder;
+          }
+          cached.lastChangeValue = null;
+        }
+      } else {
+        cached.lastChangeValue = tile.change ?? null;
+      }
+
+      // Update tile classes based on change only if state changed
+      const derivedState = this._deriveTileState(tile.change);
+      if (derivedState !== cached.lastTileState) {
+        this._updateTileClasses(cached.element, tile.change);
+        cached.lastTileState = cached.element.dataset.state || derivedState;
+      }
+
+      // Update dot state
+      this._updateDotState(cached, ticker);
+
+      // Update sparkline
+      if (priceChanged) {
+        cached.needsSparklineUpdate = true;
+      }
+      if (cached.canvas && (cached.needsSparklineUpdate || cached.needsSparklineUpdate == null)) {
+        this._updateSparkline(cached.canvas, ticker);
+        cached.needsSparklineUpdate = false;
+        const history = this.priceHistory.get(ticker);
+        if (history) {
+          cached.lastHistoryLength = history.length;
+        }
+      }
+    } finally {
+      tile.dirty = false;
+      perfEnd(perfId);
     }
-
-    if (tile.change != null) {
-      const changeText = `${tile.change > 0 ? "+" : ""}${tile.change.toFixed(2)}%`;
-      cached.change.textContent = changeText;
-    } else {
-      // No data yet - show placeholder based on mode
-      cached.change.textContent = mode === "real" ? "---" : "0.00%";
-    }
-
-    // Update tile classes based on change
-    this._updateTileClasses(cached.element, tile.change);
-
-    // Update dot state
-    this._updateDotState(cached.element, ticker);
-
-    // Update sparkline
-    this._updateSparkline(cached.canvas, ticker);
   }
 
   /**
    * Paint all tiles
    */
   paintAll() {
-    this.state.getAllTiles().forEach((tile, ticker) => {
-      this.paintTile(ticker);
-    });
+    const perfId = perfStart("paintAll");
+    try {
+      let count = 0;
+      this.assets.forEach((asset, index) => {
+        this.paintTile(asset.ticker, index);
+        count++;
+      });
+      perfEnd(perfId, count);
+    } catch (error) {
+      perfEnd(perfId);
+      throw error;
+    }
   }
 
   /**
@@ -192,27 +271,59 @@ export class AppController {
    */
   _setupEventHandlers() {
     // State events
-    this.state.on("tile:updated", ({ ticker }) => {
-      this.paintTile(ticker);
+    this.state.on("tile:updated", (payload = {}) => {
+      const { ticker } = payload;
+      if (!ticker) return;
+      const perfId = perfStart("state:tileUpdated");
 
-      // Track fetching progress in real mode
-      const mode = this.state.getMode();
-      if (mode === "real") {
-        this._updateFetchingProgress();
-      }
+      try {
+        const index =
+          typeof payload.index === "number"
+            ? payload.index
+            : this.assets.findIndex((a) => a.ticker === ticker);
 
-      // Update price history for sparkline
-      const tile = this.state.getTile(ticker);
-      if (tile && tile.price != null) {
-        let history = this.priceHistory.get(ticker) || [];
-        history.push(tile.price);
+    const tile = this.state.getTile(ticker);
+    let historyLength = 0;
+        if (tile && tile.price != null) {
+          let history = this.priceHistory.get(ticker);
+          if (!history) {
+            history = [];
+            this.priceHistory.set(ticker, history);
+          }
+          history.push(tile.price);
 
-        // Keep only last N points
-        if (history.length > CONFIG.UI.HISTORY_LENGTH) {
-          history = history.slice(-CONFIG.UI.HISTORY_LENGTH);
+          // Keep only last N points
+          const excess = history.length - CONFIG.UI.HISTORY_LENGTH;
+          if (excess > 0) {
+            history.splice(0, excess);
+          }
+
+          historyLength = history.length;
         }
 
-        this.priceHistory.set(ticker, history);
+        const cached = index >= 0 ? this.tileCache.get(index) : null;
+        if (cached) {
+          if (
+            cached.needsSparklineUpdate == null ||
+            historyLength === 0 ||
+            cached.lastHistoryLength !== historyLength
+          ) {
+            cached.needsSparklineUpdate = true;
+          }
+          if (historyLength > 0) {
+            cached.lastHistoryLength = historyLength;
+          }
+        }
+
+        this.paintTile(ticker, index);
+
+        // Track fetching progress in real mode
+        const mode = this.state.getMode();
+        if (mode === "real") {
+          this._updateFetchingProgress();
+        }
+      } finally {
+        perfEnd(perfId);
       }
     });
 
@@ -282,11 +393,30 @@ export class AppController {
     const tiles = document.querySelectorAll(".asset-tile");
 
     tiles.forEach((tile, index) => {
+      const priceEl = tile.querySelector(".price");
+      const changeEl = tile.querySelector(".change");
+      const canvas = tile.querySelector(".sparkline-canvas");
+      const ctx = canvas ? canvas.getContext("2d") : null;
+      const dotEl = tile.querySelector(".status-dot");
+      if (canvas && !canvas.__ctx) {
+        canvas.__ctx = ctx;
+      }
+
       this.tileCache.set(index, {
         element: tile,
-        price: tile.querySelector(".price"),
-        change: tile.querySelector(".change"),
-        canvas: tile.querySelector(".sparkline-canvas"),
+        price: priceEl,
+        change: changeEl,
+        canvas,
+        ctx,
+        dot: dotEl,
+        lastPriceText: priceEl ? priceEl.textContent : null,
+        lastChangeText: changeEl ? changeEl.textContent : null,
+        lastPriceValue: null,
+        lastChangeValue: null,
+        needsSparklineUpdate: true,
+        lastHistoryLength: 0,
+        lastTileState: tile.dataset.state || "neutral",
+        lastDotState: dotEl ? dotEl.dataset.state || "" : "",
       });
     });
 
@@ -309,6 +439,13 @@ export class AppController {
     } else {
       this.assets.forEach((asset) => {
         this.priceHistory.set(asset.ticker, []);
+      });
+    }
+
+    if (this.tileCache) {
+      this.tileCache.forEach((cached) => {
+        cached.needsSparklineUpdate = true;
+        cached.lastHistoryLength = 0;
       });
     }
   }
@@ -393,40 +530,45 @@ export class AppController {
    * @private
    */
   _updateTileClasses(element, change) {
-    const thresholds = CONFIG.UI.THRESHOLDS;
+    const perfId = perfStart("updateTileClasses");
     const previousState = element.dataset.state || "neutral";
+    const nextState = this._deriveTileState(change);
 
-    // Remove all state classes
-    element.classList.remove(
+    const hasClass = element.classList.contains(nextState);
+    if (nextState === previousState && hasClass) {
+      perfEnd(perfId);
+      return;
+    }
+
+    this._setTileStateClass(element, nextState);
+
+    if (nextState !== previousState) {
+      this._animateTileStateChange(element);
+    }
+    perfEnd(perfId);
+  }
+
+  _deriveTileState(change) {
+    const thresholds = CONFIG.UI.THRESHOLDS;
+    if (change == null) return "neutral";
+    if (change > thresholds.STRONG_GAIN) return "gaining-strong";
+    if (change > thresholds.MILD_GAIN) return "gaining";
+    if (change < thresholds.STRONG_LOSS) return "losing-strong";
+    if (change < thresholds.MILD_LOSS) return "losing";
+    return "neutral";
+  }
+
+  _setTileStateClass(element, state) {
+    const classList = element.classList;
+    classList.remove(
       "gaining",
       "gaining-strong",
       "losing",
       "losing-strong",
       "neutral",
     );
-
-    // If no data yet (change is null), keep neutral
-    let nextState = "neutral";
-
-    // Add appropriate class based on change
-    if (change == null) {
-      nextState = "neutral";
-    } else if (change > thresholds.STRONG_GAIN) {
-      nextState = "gaining-strong";
-    } else if (change > thresholds.MILD_GAIN) {
-      nextState = "gaining";
-    } else if (change < thresholds.STRONG_LOSS) {
-      nextState = "losing-strong";
-    } else if (change < thresholds.MILD_LOSS) {
-      nextState = "losing";
-    }
-
-    element.classList.add(nextState);
-    element.dataset.state = nextState;
-
-    if (nextState !== previousState) {
-      this._animateTileStateChange(element);
-    }
+    classList.add(state);
+    element.dataset.state = state;
   }
 
   /**
@@ -455,22 +597,26 @@ export class AppController {
    * Update dot state for a tile
    * @private
    */
-  _updateDotState(element, ticker) {
-    const dot = element.querySelector(".status-dot");
+  _updateDotState(cached, ticker) {
+    const dot = cached.dot || cached.element.querySelector(".status-dot");
     if (!dot) return;
 
-    // Get deterministic dot state from transport
     const state = this.transport.computeDotState(ticker);
+    if (!state) return;
 
-    // Remove all state classes
-    dot.classList.remove("standby", "open", "closed", "pulsing");
+    const previous = cached.lastDotState || dot.dataset.state || "";
 
-    // Add state class
-    dot.classList.add(state);
+    if (state !== previous) {
+      dot.classList.remove("standby", "open", "closed", "pulsing");
+      dot.classList.add(state);
+      dot.dataset.state = state;
+      cached.lastDotState = state;
+    }
 
-    // Add pulsing for open markets
     if (state === "open") {
       dot.classList.add("pulsing");
+    } else if (previous === "open") {
+      dot.classList.remove("pulsing");
     }
   }
 
@@ -479,12 +625,21 @@ export class AppController {
    * @private
    */
   _renderAllDots() {
-    this.tileCache.forEach((cached, index) => {
-      const asset = this.assets[index];
-      if (asset) {
-        this._updateDotState(cached.element, asset.ticker);
-      }
-    });
+    const perfId = perfStart("renderAllDots");
+    try {
+      let count = 0;
+      this.tileCache.forEach((cached, index) => {
+        const asset = this.assets[index];
+        if (asset) {
+          this._updateDotState(cached, asset.ticker);
+        }
+        count++;
+      });
+      perfEnd(perfId, count);
+    } catch (error) {
+      perfEnd(perfId);
+      throw error;
+    }
   }
 
   /**
@@ -492,15 +647,33 @@ export class AppController {
    * @private
    */
   _updateSparkline(canvas, ticker) {
+    const perfId = perfStart("updateSparkline");
     const history = this.priceHistory.get(ticker) || [];
-    if (history.length < 2) return;
+    const length = history.length;
+    if (length < 2) {
+      perfEnd(perfId);
+      return;
+    }
 
-    const ctx = canvas.getContext("2d");
+    let ctx = canvas.__ctx;
+    if (!ctx) {
+      ctx = canvas.getContext("2d");
+      canvas.__ctx = ctx;
+    }
+    if (!ctx) {
+      perfEnd(perfId);
+      return;
+    }
+
     const dpr = window.devicePixelRatio || 1;
     const logicalWidth =
       canvas.clientWidth || canvas.offsetWidth || canvas.width;
     const logicalHeight =
       canvas.clientHeight || canvas.offsetHeight || canvas.height;
+    if (!logicalWidth || !logicalHeight) {
+      perfEnd(perfId);
+      return;
+    }
     const scaledWidth = Math.round(logicalWidth * dpr);
     const scaledHeight = Math.round(logicalHeight * dpr);
 
@@ -516,9 +689,20 @@ export class AppController {
 
     ctx.clearRect(0, 0, logicalWidth, logicalHeight);
 
-    const min = Math.min(...history);
-    const max = Math.max(...history);
+    let min = Infinity;
+    let max = -Infinity;
+    for (let i = 0; i < length; i++) {
+      const value = history[i];
+      if (value < min) min = value;
+      if (value > max) max = value;
+    }
+    if (!Number.isFinite(min) || !Number.isFinite(max)) {
+      perfEnd(perfId);
+      return;
+    }
+
     const range = max - min || 1;
+    const invSpan = length > 1 ? 1 / (length - 1) : 0;
 
     // Determine the sparkline color from the tile's displayed state/percent change
     const tileElement = canvas.closest(".asset-tile");
@@ -562,25 +746,28 @@ export class AppController {
     ctx.shadowColor = shadowColor;
     ctx.shadowBlur = Math.min(8, lineThickness * 2.2);
     ctx.shadowOffsetX = 0;
-    ctx.shadowOffsetY = 0;
+  	ctx.shadowOffsetY = 0;
     ctx.beginPath();
 
-    history.forEach((price, i) => {
-      const x = (i / (history.length - 1)) * logicalWidth;
-      const y = logicalHeight - ((price - min) / range) * logicalHeight;
-
+    const heightScale = logicalHeight / range;
+    for (let i = 0; i < length; i++) {
+      const ratio = i * invSpan;
+      const price = history[i];
+      const x = ratio * logicalWidth;
+      const y = logicalHeight - (price - min) * heightScale;
       if (i === 0) {
         ctx.moveTo(x, y);
       } else {
         ctx.lineTo(x, y);
       }
-    });
+    }
 
     ctx.stroke();
 
     // Reset shadow for subsequent draws
     ctx.shadowBlur = 0;
     ctx.shadowColor = "transparent";
+    perfEnd(perfId, length);
   }
 
   /**
@@ -688,9 +875,24 @@ export class AppController {
    * @private
    */
   _updateSimulation() {
+    const perfId = perfStart("updateSimulation");
+    let processed = 0;
+    const assetsLength = this.assets.length;
+    if (assetsLength === 0) {
+      perfEnd(perfId, 0);
+      return;
+    }
+
+    const now = Date.now();
+    const momentumBase = now / 10000;
+    const volatilityOscillation = Math.sin(now / 5000) * CONFIG.UI.VOLATILITY.AMPLITUDE;
+    const baseVolatility =
+      (CONFIG.UI.VOLATILITY.BASE + volatilityOscillation) * CONFIG.UI.VOLATILITY.USER_MULTIPLIER;
+
     this.assets.forEach((asset, index) => {
       const tile = this.state.getTile(asset.ticker);
       if (!tile) return;
+      tile.dirty = true;
 
       // Ensure we have base values for simulation (use placeholders)
       if (tile.basePrice == null) {
@@ -701,14 +903,9 @@ export class AppController {
       }
 
       // Simulate realistic price movements
-      const momentum = Math.sin(Date.now() / 10000 + index) * 0.3;
+      const momentum = Math.sin(momentumBase + index) * 0.3;
       const randomFactor = (Math.random() - 0.5) * 2;
-      const volatility =
-        (CONFIG.UI.VOLATILITY.BASE +
-          Math.sin(Date.now() / 5000) * CONFIG.UI.VOLATILITY.AMPLITUDE) *
-        CONFIG.UI.VOLATILITY.USER_MULTIPLIER;
-
-      const changeAmount = (momentum + randomFactor) * volatility;
+      const changeAmount = (momentum + randomFactor) * baseVolatility;
       tile.change += changeAmount;
 
       // Mean reversion
@@ -732,25 +929,16 @@ export class AppController {
       tile.low = tile.low != null ? Math.min(tile.low, tile.price) : tile.price;
       tile.volume = (tile.volume || 0) + Math.abs(changeAmount) * 850;
       tile.volume = Math.min(tile.volume, 5000000);
-      tile.lastTradeTs = Date.now();
-
-      // Update price history
-      let history = this.priceHistory.get(asset.ticker) || [];
-      history.push(tile.price);
-      if (history.length > CONFIG.UI.HISTORY_LENGTH) {
-        history = history.slice(-CONFIG.UI.HISTORY_LENGTH);
-      }
-      this.priceHistory.set(asset.ticker, history);
+      tile.lastTradeTs = now;
 
       // Mark as having info in simulation
       tile.hasInfo = true;
 
-      // Paint tile
-      this.paintTile(asset.ticker);
-
       // Emit tile updated event for stats
-      this.state.emit("tile:updated", { ticker: asset.ticker });
+      this.state.emit("tile:updated", { ticker: asset.ticker, index });
+      processed++;
     });
+    perfEnd(perfId, processed);
   }
 
   /**
@@ -863,8 +1051,12 @@ export class AppController {
    * @private
    */
   _updateFetchingProgress() {
+    const perfId = perfStart("updateFetchingProgress");
     const mode = this.state.getMode();
-    if (mode !== "real") return;
+    if (mode !== "real") {
+      perfEnd(perfId);
+      return;
+    }
 
     // Count tiles with COMPLETE data (price AND change)
     let tilesWithData = 0;
@@ -892,6 +1084,7 @@ export class AppController {
       );
       this.fetchingJustCompleted = false;
     }
+    perfEnd(perfId);
   }
 
   /**

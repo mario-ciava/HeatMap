@@ -6,8 +6,31 @@
 import { AppController } from "../services/AppController.js";
 import { CONFIG } from "../config.js";
 import { logger } from "../utils/Logger.js";
+import { perfMonitor, perfReport } from "../utils/PerfMonitor.js";
 
 const log = logger.child("Main");
+const isPerfEnabled = () =>
+  typeof window === "undefined" || window.__heatmapPerfEnabled !== false;
+const perfStart = (label) => (isPerfEnabled() ? perfMonitor.start(label) : null);
+const perfEnd = (id, weight) => {
+  if (id != null) {
+    perfMonitor.end(id, weight);
+  }
+};
+
+if (typeof window !== "undefined") {
+  if (typeof window.__heatmapPerfEnabled === "undefined") {
+    window.__heatmapPerfEnabled = true;
+  }
+  if (!window.showHeatmapPerf) {
+    window.showHeatmapPerf = (options = {}) =>
+      perfReport({
+        toConsole: true,
+        sortBy: "score",
+        ...options,
+      });
+  }
+}
 
 // Set log level from config
 logger.setLevel(CONFIG.LOG_LEVEL);
@@ -751,6 +774,7 @@ document.addEventListener("keydown", (event) => {
 // ============================================================================
 
 let app = null;
+let statsUpdateScheduled = false;
 
 // ============================================================================
 // Initialization
@@ -829,7 +853,7 @@ function initHeatmap() {
 
   // Listen for tile updates to refresh statistics and modal
   app.state.on("tile:updated", () => {
-    updateStats();
+    scheduleStatsUpdate();
     updateModalIfOpen();
   });
 
@@ -873,159 +897,190 @@ function setupFiltersAndSearch() {
 }
 
 function applyFilters() {
-  const searchTerm =
-    document.getElementById("asset-search")?.value.toLowerCase() || "";
-  const filter = document.getElementById("filter-select")?.value || "all";
-  const sort = document.getElementById("sort-select")?.value || "default";
+  const perfId = perfStart("applyFilters");
+  let processed = 0;
+  try {
+    const searchTerm =
+      document.getElementById("asset-search")?.value.toLowerCase() || "";
+    const filter = document.getElementById("filter-select")?.value || "all";
+    const sort = document.getElementById("sort-select")?.value || "default";
 
-  const tiles = Array.from(
-    document.querySelectorAll(".asset-tile:not(.add-tile)"),
-  );
+    const tiles = Array.from(
+      document.querySelectorAll(".asset-tile:not(.add-tile)"),
+    );
 
-  tiles.forEach((tile) => {
-    const index = parseInt(tile.dataset.index);
-    if (isNaN(index)) return; // Skip tiles without valid index
+    tiles.forEach((tile) => {
+      processed++;
+      const index = parseInt(tile.dataset.index);
+      if (isNaN(index)) return; // Skip tiles without valid index
 
-    const asset = assets[index];
-    if (!asset) return; // Skip if asset not found
+      const asset = assets[index];
+      if (!asset) return; // Skip if asset not found
 
-    const tileState = app.state.getTile(asset.ticker);
+      const tileState = app.state.getTile(asset.ticker);
 
-    let show = true;
+      let show = true;
 
-    // Search filter
-    if (searchTerm) {
-      show =
-        asset.ticker.toLowerCase().includes(searchTerm) ||
-        asset.name.toLowerCase().includes(searchTerm) ||
-        asset.sector.toLowerCase().includes(searchTerm);
-    }
-
-    // Category filter
-    if (show) {
-      const change = tileState?.change || 0;
-      switch (filter) {
-        case "gaining":
-          show = change > CONFIG.UI.THRESHOLDS.MILD_GAIN;
-          break;
-        case "losing":
-          show = change < CONFIG.UI.THRESHOLDS.MILD_LOSS;
-          break;
-        case "neutral":
-          show =
-            change >= CONFIG.UI.THRESHOLDS.MILD_LOSS &&
-            change <= CONFIG.UI.THRESHOLDS.MILD_GAIN;
-          break;
+      // Search filter
+      if (searchTerm) {
+        show =
+          asset.ticker.toLowerCase().includes(searchTerm) ||
+          asset.name.toLowerCase().includes(searchTerm) ||
+          asset.sector.toLowerCase().includes(searchTerm);
       }
-    }
 
-    tile.classList.toggle("hidden", !show);
-  });
+      // Category filter
+      if (show) {
+        const change = tileState?.change || 0;
+        switch (filter) {
+          case "gaining":
+            show = change > CONFIG.UI.THRESHOLDS.MILD_GAIN;
+            break;
+          case "losing":
+            show = change < CONFIG.UI.THRESHOLDS.MILD_LOSS;
+            break;
+          case "neutral":
+            show =
+              change >= CONFIG.UI.THRESHOLDS.MILD_LOSS &&
+              change <= CONFIG.UI.THRESHOLDS.MILD_GAIN;
+            break;
+        }
+      }
 
-  // Apply sorting
-  applySorting(sort);
+      tile.classList.toggle("hidden", !show);
+    });
 
-  // Update stats
-  updateStats();
-}
+    // Apply sorting
+    applySorting(sort);
 
-function applySorting(sortType) {
-  const container = document.getElementById("heatmap");
-  const allTiles = Array.from(container.children);
-
-  // Separate add-tile from regular tiles
-  const addTile = allTiles.find((t) => t.classList.contains("add-tile"));
-  const tiles = allTiles.filter((t) => !t.classList.contains("add-tile"));
-
-  tiles.sort((a, b) => {
-    const indexA = parseInt(a.dataset.index);
-    const indexB = parseInt(b.dataset.index);
-
-    // Handle invalid indices
-    if (isNaN(indexA) || isNaN(indexB)) return 0;
-
-    const assetA = assets[indexA];
-    const assetB = assets[indexB];
-
-    // Handle missing assets
-    if (!assetA || !assetB) return 0;
-
-    const tileA = app.state.getTile(assetA.ticker);
-    const tileB = app.state.getTile(assetB.ticker);
-
-    switch (sortType) {
-      case "change-desc":
-        return (tileB?.change || 0) - (tileA?.change || 0);
-      case "change-asc":
-        return (tileA?.change || 0) - (tileB?.change || 0);
-      case "price-desc":
-        return (tileB?.price || 0) - (tileA?.price || 0);
-      case "price-asc":
-        return (tileA?.price || 0) - (tileB?.price || 0);
-      case "ticker":
-        return assetA.ticker.localeCompare(assetB.ticker);
-      default:
-        return indexA - indexB;
-    }
-  });
-
-  // Re-append tiles in sorted order
-  tiles.forEach((tile) => container.appendChild(tile));
-
-  // Always append add-tile at the end
-  if (addTile) {
-    container.appendChild(addTile);
+    // Update stats
+    updateStats();
+  } finally {
+    perfEnd(perfId, Math.max(processed, 1));
   }
 }
 
+function applySorting(sortType) {
+  const perfId = perfStart("applySorting");
+  let processed = 0;
+  try {
+    const container = document.getElementById("heatmap");
+    const allTiles = Array.from(container.children);
+
+    // Separate add-tile from regular tiles
+    const addTile = allTiles.find((t) => t.classList.contains("add-tile"));
+    const tiles = allTiles.filter((t) => !t.classList.contains("add-tile"));
+
+    tiles.sort((a, b) => {
+      processed++;
+      const indexA = parseInt(a.dataset.index);
+      const indexB = parseInt(b.dataset.index);
+
+      // Handle invalid indices
+      if (isNaN(indexA) || isNaN(indexB)) return 0;
+
+      const assetA = assets[indexA];
+      const assetB = assets[indexB];
+
+      // Handle missing assets
+      if (!assetA || !assetB) return 0;
+
+      const tileA = app.state.getTile(assetA.ticker);
+      const tileB = app.state.getTile(assetB.ticker);
+
+      switch (sortType) {
+        case "change-desc":
+          return (tileB?.change || 0) - (tileA?.change || 0);
+        case "change-asc":
+          return (tileA?.change || 0) - (tileB?.change || 0);
+        case "price-desc":
+          return (tileB?.price || 0) - (tileA?.price || 0);
+        case "price-asc":
+          return (tileA?.price || 0) - (tileB?.price || 0);
+        case "ticker":
+          return assetA.ticker.localeCompare(assetB.ticker);
+        default:
+          return indexA - indexB;
+      }
+    });
+
+    // Re-append tiles in sorted order
+    tiles.forEach((tile) => container.appendChild(tile));
+
+    // Always append add-tile at the end
+    if (addTile) {
+      container.appendChild(addTile);
+    }
+  } finally {
+    perfEnd(perfId, Math.max(processed, 1));
+  }
+}
+
+function scheduleStatsUpdate() {
+  if (statsUpdateScheduled) return;
+  statsUpdateScheduled = true;
+  requestAnimationFrame(() => {
+    statsUpdateScheduled = false;
+    updateStats();
+  });
+}
+
 function updateStats() {
-  const tiles = document.querySelectorAll(
-    ".asset-tile:not(.hidden):not(.add-tile)",
-  );
+  const perfId = perfStart("updateStats");
+  let sampleCount = 0;
   let gaining = 0;
   let losing = 0;
   let totalChange = 0;
   const changes = [];
 
-  tiles.forEach((tile) => {
-    const index = parseInt(tile.dataset.index);
-    if (isNaN(index)) return; // Skip tiles without valid index
+  try {
+    const tiles = document.querySelectorAll(
+      ".asset-tile:not(.hidden):not(.add-tile)",
+    );
+    sampleCount = tiles.length;
 
-    const asset = assets[index];
-    if (!asset) return; // Skip if asset not found
+    tiles.forEach((tile) => {
+      const index = parseInt(tile.dataset.index);
+      if (isNaN(index)) return; // Skip tiles without valid index
 
-    const tileState = app.state.getTile(asset.ticker);
-    const change = tileState?.change || 0;
+      const asset = assets[index];
+      if (!asset) return; // Skip if asset not found
 
-    if (change > CONFIG.UI.THRESHOLDS.MILD_GAIN) gaining++;
-    else if (change < CONFIG.UI.THRESHOLDS.MILD_LOSS) losing++;
+      const tileState = app.state.getTile(asset.ticker);
+      const change = tileState?.change || 0;
 
-    totalChange += change;
-    changes.push(Math.abs(change));
-  });
+      if (change > CONFIG.UI.THRESHOLDS.MILD_GAIN) gaining++;
+      else if (change < CONFIG.UI.THRESHOLDS.MILD_LOSS) losing++;
 
-  const count = tiles.length || 1;
+      totalChange += change;
+      changes.push(Math.abs(change));
+    });
 
-  document.getElementById("gaining").textContent = gaining;
-  document.getElementById("losing").textContent = losing;
-  document.getElementById("totalAssets").textContent = count;
+    const count = sampleCount || 1;
 
-  const marketTemp = (((gaining - losing) / count) * 50).toFixed(1);
-  const tempEl = document.getElementById("marketTemp");
-  tempEl.textContent = `${marketTemp}°C`;
-  tempEl.className = `stat-value ${marketTemp > 10 ? "positive" : marketTemp < -10 ? "negative" : "neutral"}`;
+    document.getElementById("gaining").textContent = gaining;
+    document.getElementById("losing").textContent = losing;
+    document.getElementById("totalAssets").textContent = count;
 
-  // Volatility: average of absolute changes (represents actual market movement)
-  const volatility = (
-    changes.reduce((sum, val) => sum + val, 0) / count
-  ).toFixed(2);
-  document.getElementById("volatility").textContent = `${volatility}%`;
+    const marketTemp = (((gaining - losing) / count) * 50).toFixed(1);
+    const tempEl = document.getElementById("marketTemp");
+    tempEl.textContent = `${marketTemp}°C`;
+    tempEl.className = `stat-value ${marketTemp > 10 ? "positive" : marketTemp < -10 ? "negative" : "neutral"}`;
 
-  // Average Change: net average (can be positive or negative)
-  const avgChange = (totalChange / count).toFixed(2);
-  const avgEl = document.getElementById("avgChange");
-  avgEl.textContent = `${avgChange > 0 ? "+" : ""}${avgChange}%`;
-  avgEl.className = `stat-value ${avgChange > 0 ? "positive" : avgChange < 0 ? "negative" : "neutral"}`;
+    // Volatility: average of absolute changes (represents actual market movement)
+    const volatility = (
+      changes.reduce((sum, val) => sum + val, 0) / count
+    ).toFixed(2);
+    document.getElementById("volatility").textContent = `${volatility}%`;
+
+    // Average Change: net average (can be positive or negative)
+    const avgChange = (totalChange / count).toFixed(2);
+    const avgEl = document.getElementById("avgChange");
+    avgEl.textContent = `${avgChange > 0 ? "+" : ""}${avgChange}%`;
+    avgEl.className = `stat-value ${avgChange > 0 ? "positive" : avgChange < 0 ? "negative" : "neutral"}`;
+  } finally {
+    perfEnd(perfId, Math.max(sampleCount, 1));
+  }
 }
 
 function setupSliders() {
@@ -1395,8 +1450,17 @@ function updateModalIfOpen() {
 }
 
 function drawModalChart(history) {
+  const perfId = perfStart("drawModalChart");
+  let pointCount = 0;
+  const finish = (weight) => {
+    perfEnd(perfId, Math.max(weight ?? pointCount, 1));
+  };
+
   const canvas = document.getElementById("modal-chart");
-  if (!canvas) return;
+  if (!canvas) {
+    finish(1);
+    return;
+  }
 
   const ctx = canvas.getContext("2d");
   canvas.width = canvas.offsetWidth;
@@ -1419,6 +1483,7 @@ function drawModalChart(history) {
     }
     canvas.__chartData = null;
     resetChartOverlays();
+    finish(1);
     return;
   }
 
@@ -1450,6 +1515,7 @@ function drawModalChart(history) {
     const y = height - ((price - min) / range) * height * 0.82 - height * 0.09;
     return { x, y, value: price };
   });
+  pointCount = points.length;
 
   const lineColor = trend >= 0 ? "#10b981" : "#ef4444";
 
@@ -1487,6 +1553,7 @@ function drawModalChart(history) {
 
   canvas.__chartData = { points, width, height, color: lineColor };
   attachModalChartInteractions(canvas);
+  finish();
 }
 
 function resetChartOverlays() {
