@@ -7,21 +7,19 @@ import { FinnhubTransport } from "../transport/FinnhubTransport.js";
 import { StateManager } from "../core/StateManager.js";
 import { CONFIG } from "../config.js";
 import { logger } from "../utils/Logger.js";
-import { perfMonitor } from "../utils/PerfMonitor.js";
+import { perfStart, perfEnd } from "../utils/perfHelpers.js";
+import { UpdateScheduler } from "../core/UpdateScheduler.js";
+import { TileRenderer } from "../render/TileRenderer.js";
 
 const log = logger.child("App");
-const isPerfEnabled = () =>
-  typeof window === "undefined" || window.__heatmapPerfEnabled !== false;
-const perfStart = (label) => (isPerfEnabled() ? perfMonitor.start(label) : null);
-const perfEnd = (id, weight) => {
-  if (id != null) {
-    perfMonitor.end(id, weight);
-  }
-};
 
 export class AppController {
   constructor(assets) {
     this.assets = assets;
+    this.assetIndexLookup = new Map();
+    this.assets.forEach((asset, index) => {
+      this.assetIndexLookup.set(asset.ticker, index);
+    });
 
     // Initialize state manager with assets
     this.state = new StateManager(assets);
@@ -45,6 +43,23 @@ export class AppController {
     // Wire up event handlers
     this._setupEventHandlers();
     this._setupDOMCache();
+
+    this.renderer = new TileRenderer({
+      state: this.state,
+      transport: this.transport,
+      assets: this.assets,
+      assetIndexLookup: this.assetIndexLookup,
+      tileCache: this.tileCache,
+      priceHistory: this.priceHistory,
+    });
+    this.renderer.setTransport(this.transport);
+
+    this.updateScheduler = new UpdateScheduler(
+      (batch) => {
+        this.renderer.renderBatch(batch);
+      },
+      { perfLabel: "tileBatchFlush" },
+    );
 
     log.info("AppController initialized");
   }
@@ -150,101 +165,11 @@ export class AppController {
    */
   paintTile(ticker, indexHint = undefined) {
     const tile = this.state.getTile(ticker);
-    if (!tile) return;
-
-    const index =
-      typeof indexHint === "number" ? indexHint : this.assets.findIndex((a) => a.ticker === ticker);
-    if (index === -1) return;
-
-    const cached = this.tileCache.get(index);
-    if (!cached) return;
-
-    if (tile.dirty === false && cached.lastTileState === cached.element.dataset.state) {
-      return;
+    if (tile) {
+      tile.dirty = true;
     }
-
-    const perfId = perfStart("paintTile");
-    const mode = this.state.getMode();
-
-    try {
-      let priceChanged = false;
-
-      // Update price and change text
-      if (cached.price) {
-        if (tile.price != null) {
-          const priceValue = tile.price;
-          const priceText = `$${priceValue.toFixed(2)}`;
-          if (cached.lastPriceValue !== priceValue) {
-            priceChanged = true;
-          }
-          if (cached.lastPriceText !== priceText) {
-            cached.price.textContent = priceText;
-            cached.lastPriceText = priceText;
-          }
-          cached.lastPriceValue = priceValue;
-        } else {
-          if (cached.lastPriceValue != null) {
-            priceChanged = true;
-          }
-          const placeholder = mode === "real" ? "---" : "$0.00";
-          if (cached.lastPriceText !== placeholder) {
-            cached.price.textContent = placeholder;
-            cached.lastPriceText = placeholder;
-          }
-          cached.lastPriceValue = null;
-        }
-      } else {
-        // No price element (defensive)
-        cached.lastPriceValue = tile.price ?? null;
-      }
-
-      if (cached.change) {
-        if (tile.change != null) {
-          const changeValue = tile.change;
-          const changeText = `${changeValue > 0 ? "+" : ""}${changeValue.toFixed(2)}%`;
-          if (cached.lastChangeText !== changeText) {
-            cached.change.textContent = changeText;
-            cached.lastChangeText = changeText;
-          }
-          cached.lastChangeValue = changeValue;
-        } else {
-          const placeholder = mode === "real" ? "---" : "0.00%";
-          if (cached.lastChangeText !== placeholder) {
-            cached.change.textContent = placeholder;
-            cached.lastChangeText = placeholder;
-          }
-          cached.lastChangeValue = null;
-        }
-      } else {
-        cached.lastChangeValue = tile.change ?? null;
-      }
-
-      // Update tile classes based on change only if state changed
-      const derivedState = this._deriveTileState(tile.change);
-      if (derivedState !== cached.lastTileState) {
-        this._updateTileClasses(cached.element, tile.change);
-        cached.lastTileState = cached.element.dataset.state || derivedState;
-      }
-
-      // Update dot state
-      this._updateDotState(cached, ticker);
-
-      // Update sparkline
-      if (priceChanged) {
-        cached.needsSparklineUpdate = true;
-      }
-      if (cached.canvas && (cached.needsSparklineUpdate || cached.needsSparklineUpdate == null)) {
-        this._updateSparkline(cached.canvas, ticker);
-        cached.needsSparklineUpdate = false;
-        const history = this.priceHistory.get(ticker);
-        if (history) {
-          cached.lastHistoryLength = history.length;
-        }
-      }
-    } finally {
-      tile.dirty = false;
-      perfEnd(perfId);
-    }
+    this.updateScheduler.cancel(ticker);
+    this.renderer.renderTile(ticker, indexHint);
   }
 
   /**
@@ -253,12 +178,10 @@ export class AppController {
   paintAll() {
     const perfId = perfStart("paintAll");
     try {
-      let count = 0;
-      this.assets.forEach((asset, index) => {
-        this.paintTile(asset.ticker, index);
-        count++;
-      });
-      perfEnd(perfId, count);
+      this.updateScheduler.clear();
+      this._markAllTilesDirty();
+      this.renderer.renderAll();
+      perfEnd(perfId, this.assets.length);
     } catch (error) {
       perfEnd(perfId);
       throw error;
@@ -280,10 +203,10 @@ export class AppController {
         const index =
           typeof payload.index === "number"
             ? payload.index
-            : this.assets.findIndex((a) => a.ticker === ticker);
+            : (this.assetIndexLookup.get(ticker) ?? -1);
 
-    const tile = this.state.getTile(ticker);
-    let historyLength = 0;
+        const tile = this.state.getTile(ticker);
+        let historyLength = 0;
         if (tile && tile.price != null) {
           let history = this.priceHistory.get(ticker);
           if (!history) {
@@ -297,7 +220,6 @@ export class AppController {
           if (excess > 0) {
             history.splice(0, excess);
           }
-
           historyLength = history.length;
         }
 
@@ -315,7 +237,7 @@ export class AppController {
           }
         }
 
-        this.paintTile(ticker, index);
+        this.updateScheduler.request(ticker, index);
 
         // Track fetching progress in real mode
         const mode = this.state.getMode();
@@ -334,6 +256,10 @@ export class AppController {
     this.state.on("market:status", () => {
       // Market status changed - update all dots
       this._renderAllDots();
+    });
+
+    this.state.on("state:restored", () => {
+      this.paintAll();
     });
 
     // Transport events
@@ -526,74 +452,6 @@ export class AppController {
   }
 
   /**
-   * Update tile classes based on change percentage
-   * @private
-   */
-  _updateTileClasses(element, change) {
-    const perfId = perfStart("updateTileClasses");
-    const previousState = element.dataset.state || "neutral";
-    const nextState = this._deriveTileState(change);
-
-    const hasClass = element.classList.contains(nextState);
-    if (nextState === previousState && hasClass) {
-      perfEnd(perfId);
-      return;
-    }
-
-    this._setTileStateClass(element, nextState);
-
-    if (nextState !== previousState) {
-      this._animateTileStateChange(element);
-    }
-    perfEnd(perfId);
-  }
-
-  _deriveTileState(change) {
-    const thresholds = CONFIG.UI.THRESHOLDS;
-    if (change == null) return "neutral";
-    if (change > thresholds.STRONG_GAIN) return "gaining-strong";
-    if (change > thresholds.MILD_GAIN) return "gaining";
-    if (change < thresholds.STRONG_LOSS) return "losing-strong";
-    if (change < thresholds.MILD_LOSS) return "losing";
-    return "neutral";
-  }
-
-  _setTileStateClass(element, state) {
-    const classList = element.classList;
-    classList.remove(
-      "gaining",
-      "gaining-strong",
-      "losing",
-      "losing-strong",
-      "neutral",
-    );
-    classList.add(state);
-    element.dataset.state = state;
-  }
-
-  /**
-   * Add a subtle flare when a tile changes state to ensure consistent feedback
-   * @private
-   */
-  _animateTileStateChange(element) {
-    if (!element) return;
-
-    if (element._stateChangeTimeout) {
-      clearTimeout(element._stateChangeTimeout);
-    }
-
-    element.classList.remove("tile-state-change");
-    // Force reflow so animation can retrigger
-    void element.offsetWidth;
-    element.classList.add("tile-state-change");
-
-    element._stateChangeTimeout = setTimeout(() => {
-      element.classList.remove("tile-state-change");
-      element._stateChangeTimeout = null;
-    }, 450);
-  }
-
-  /**
    * Update dot state for a tile
    * @private
    */
@@ -625,150 +483,10 @@ export class AppController {
    * @private
    */
   _renderAllDots() {
-    const perfId = perfStart("renderAllDots");
-    try {
-      let count = 0;
-      this.tileCache.forEach((cached, index) => {
-        const asset = this.assets[index];
-        if (asset) {
-          this._updateDotState(cached, asset.ticker);
-        }
-        count++;
-      });
-      perfEnd(perfId, count);
-    } catch (error) {
-      perfEnd(perfId);
-      throw error;
-    }
+    this.renderer.refreshDots();
   }
 
-  /**
-   * Update sparkline canvas
-   * @private
-   */
-  _updateSparkline(canvas, ticker) {
-    const perfId = perfStart("updateSparkline");
-    const history = this.priceHistory.get(ticker) || [];
-    const length = history.length;
-    if (length < 2) {
-      perfEnd(perfId);
-      return;
-    }
-
-    let ctx = canvas.__ctx;
-    if (!ctx) {
-      ctx = canvas.getContext("2d");
-      canvas.__ctx = ctx;
-    }
-    if (!ctx) {
-      perfEnd(perfId);
-      return;
-    }
-
-    const dpr = window.devicePixelRatio || 1;
-    const logicalWidth =
-      canvas.clientWidth || canvas.offsetWidth || canvas.width;
-    const logicalHeight =
-      canvas.clientHeight || canvas.offsetHeight || canvas.height;
-    if (!logicalWidth || !logicalHeight) {
-      perfEnd(perfId);
-      return;
-    }
-    const scaledWidth = Math.round(logicalWidth * dpr);
-    const scaledHeight = Math.round(logicalHeight * dpr);
-
-    if (canvas.width !== scaledWidth || canvas.height !== scaledHeight) {
-      canvas.width = scaledWidth;
-      canvas.height = scaledHeight;
-      canvas.style.width = `${logicalWidth}px`;
-      canvas.style.height = `${logicalHeight}px`;
-    }
-
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.scale(dpr, dpr);
-
-    ctx.clearRect(0, 0, logicalWidth, logicalHeight);
-
-    let min = Infinity;
-    let max = -Infinity;
-    for (let i = 0; i < length; i++) {
-      const value = history[i];
-      if (value < min) min = value;
-      if (value > max) max = value;
-    }
-    if (!Number.isFinite(min) || !Number.isFinite(max)) {
-      perfEnd(perfId);
-      return;
-    }
-
-    const range = max - min || 1;
-    const invSpan = length > 1 ? 1 / (length - 1) : 0;
-
-    // Determine the sparkline color from the tile's displayed state/percent change
-    const tileElement = canvas.closest(".asset-tile");
-    let tileState = tileElement?.dataset.state || "";
-
-    const tile = this.state.getTile(ticker);
-    let change = tile && tile.change != null ? tile.change : null;
-    if (change != null && typeof change !== "number") {
-      const parsed = Number.parseFloat(change);
-      change = Number.isNaN(parsed) ? null : parsed;
-    }
-
-    let trend = null;
-    if (tileState === "gaining" || tileState === "gaining-strong") {
-      trend = "up";
-    } else if (tileState === "losing" || tileState === "losing-strong") {
-      trend = "down";
-    } else if (change != null) {
-      if (change > 0.0001) trend = "up";
-      else if (change < -0.0001) trend = "down";
-    }
-
-    let strokeColor = "#1cc16b";
-    if (trend === "down") {
-      strokeColor = "#ef4444";
-    } else if (trend === null) {
-      strokeColor = "rgba(226, 232, 240, 0.85)";
-    }
-
-    const lineThickness = Math.max(2, logicalHeight / 14);
-    ctx.lineWidth = lineThickness;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    ctx.strokeStyle = strokeColor;
-    let shadowColor = "rgba(28, 193, 107, 0.35)";
-    if (trend === "down") {
-      shadowColor = "rgba(239, 68, 68, 0.3)";
-    } else if (trend === null) {
-      shadowColor = "rgba(148, 163, 184, 0.35)";
-    }
-    ctx.shadowColor = shadowColor;
-    ctx.shadowBlur = Math.min(8, lineThickness * 2.2);
-    ctx.shadowOffsetX = 0;
-  	ctx.shadowOffsetY = 0;
-    ctx.beginPath();
-
-    const heightScale = logicalHeight / range;
-    for (let i = 0; i < length; i++) {
-      const ratio = i * invSpan;
-      const price = history[i];
-      const x = ratio * logicalWidth;
-      const y = logicalHeight - (price - min) * heightScale;
-      if (i === 0) {
-        ctx.moveTo(x, y);
-      } else {
-        ctx.lineTo(x, y);
-      }
-    }
-
-    ctx.stroke();
-
-    // Reset shadow for subsequent draws
-    ctx.shadowBlur = 0;
-    ctx.shadowColor = "transparent";
-    perfEnd(perfId, length);
-  }
+  // Sparkline rendering handled by TileRenderer
 
   /**
    * Adjust simulation update frequency and restart loop if needed
@@ -947,6 +665,14 @@ export class AppController {
    */
   _renderAll() {
     this.paintAll();
+  }
+
+  _markAllTilesDirty() {
+    this.state.getAllTiles().forEach((tile) => {
+      if (tile) {
+        tile.dirty = true;
+      }
+    });
   }
 
   /**

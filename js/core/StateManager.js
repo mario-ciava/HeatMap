@@ -54,7 +54,8 @@ export class StateManager extends EventEmitter {
         low: null,
         volume: null,
         hasInfo: false, // Start with NO INFO
-        lastTradeTs: 0
+        lastTradeTs: 0,
+        dirty: true
       });
     });
   }
@@ -162,6 +163,7 @@ export class StateManager extends EventEmitter {
     // Mark as having info now
     tile.hasInfo = true;
     tile.lastTradeTs = quoteData.timestamp || Date.now();
+    tile.dirty = true;
 
     if (quoteData.volume != null) {
       tile.volume = (tile.volume || 0) + quoteData.volume;
@@ -186,6 +188,7 @@ export class StateManager extends EventEmitter {
 
     tile.hasInfo = false;
     tile.lastTradeTs = 0;
+    tile.dirty = true;
 
     this.emit('tile:reset', { ticker });
   }
@@ -225,6 +228,7 @@ export class StateManager extends EventEmitter {
         tile.volume = 0;
         tile.hasInfo = false;
         tile.lastTradeTs = 0;
+        tile.dirty = true;
       } else {
         // Real mode: restore previously saved data if available and requested
         if (preserveRealData && tile._savedRealPrice != null) {
@@ -238,6 +242,7 @@ export class StateManager extends EventEmitter {
           tile.low = tile._savedRealLow;
           tile.volume = tile._savedRealVolume;
           tile.hasInfo = true;
+          tile.dirty = true;
         } else {
           // Clear data for real mode (waiting for API)
           tile.price = null;
@@ -250,6 +255,7 @@ export class StateManager extends EventEmitter {
           tile.volume = 0;
           tile.hasInfo = false;
           tile.lastTradeTs = 0;
+          tile.dirty = true;
         }
       }
     });
@@ -339,7 +345,8 @@ export class StateManager extends EventEmitter {
           low: tileData.low,
           volume: tileData.volume,
           hasInfo: tileData.hasInfo,
-          lastTradeTs: tileData.lastTradeTs
+          lastTradeTs: tileData.lastTradeTs,
+          dirty: true
         });
       }
     });
