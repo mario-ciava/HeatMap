@@ -8,18 +8,16 @@ import { StateManager } from "../core/StateManager.js";
 import { CONFIG } from "../config.js";
 import { logger } from "../utils/Logger.js";
 import { perfStart, perfEnd } from "../utils/perfHelpers.js";
-import { UpdateScheduler } from "../core/UpdateScheduler.js";
-import { TileRenderer } from "../render/TileRenderer.js";
+import { TileRegistry } from "../registry/TileRegistry.js";
+import { TileController } from "../controllers/TileController.js";
+import { SimulationController } from "../controllers/SimulationController.js";
 
 const log = logger.child("App");
 
 export class AppController {
   constructor(assets) {
     this.assets = assets;
-    this.assetIndexLookup = new Map();
-    this.assets.forEach((asset, index) => {
-      this.assetIndexLookup.set(asset.ticker, index);
-    });
+    this.tileRegistry = new TileRegistry(this.assets);
 
     // Initialize state manager with assets
     this.state = new StateManager(assets);
@@ -31,10 +29,6 @@ export class AppController {
     this.transport = new FinnhubTransport(savedApiKey, this.state);
 
     // UI state
-    this.simulationInterval = null;
-    this.tileCache = new Map(); // Cache of DOM elements + metadata
-    this.priceHistory = new Map(); // Price history for sparklines
-
     // Fetching progress tracking
     this.fetchingTotal = 0;
     this.fetchingCompleted = 0;
@@ -42,24 +36,22 @@ export class AppController {
 
     // Wire up event handlers
     this._setupEventHandlers();
-    this._setupDOMCache();
+    this.tileRegistry.initializeDOMCache();
 
-    this.renderer = new TileRenderer({
+    this.tileController = new TileController({
       state: this.state,
       transport: this.transport,
-      assets: this.assets,
-      assetIndexLookup: this.assetIndexLookup,
-      tileCache: this.tileCache,
-      priceHistory: this.priceHistory,
+      registry: this.tileRegistry,
+      historyLength: CONFIG.UI.HISTORY_LENGTH,
     });
-    this.renderer.setTransport(this.transport);
+    this.tileController.resetPriceHistory("simulation");
 
-    this.updateScheduler = new UpdateScheduler(
-      (batch) => {
-        this.renderer.renderBatch(batch);
-      },
-      { perfLabel: "tileBatchFlush" },
-    );
+    this.simulation = new SimulationController({
+      state: this.state,
+      transport: this.transport,
+      tileController: this.tileController,
+      assets: this.assets,
+    });
 
     log.info("AppController initialized");
   }
@@ -98,7 +90,7 @@ export class AppController {
 
     // Allow initial setup even if mode is the same
     const isInitialSetup =
-      oldMode === mode && !this.simulationInterval && !this.transport.isRunning;
+      oldMode === mode && !this.simulation.isRunning() && !this.transport.isRunning;
 
     if (oldMode === mode && !isInitialSetup) {
       log.debug(`Already in ${mode} mode`);
@@ -111,12 +103,12 @@ export class AppController {
     this.state.setMode(mode);
 
     if (mode === "real") {
-      // Stop simulation
-      this._stopSimulation();
+      // Stop simulation loop
+      this.simulation.stop();
 
       // Reset tiles but preserve any previously fetched real data
       this.state.resetAllTiles(true);
-      this._resetPriceHistoryForMode("real");
+      this.tileController.resetPriceHistory("real");
 
       // Initialize fetching progress counter
       this.fetchingTotal = this.assets.length;
@@ -124,7 +116,8 @@ export class AppController {
 
       // Start transport
       const tickers = this.assets.map((a) => a.ticker);
-      this.transport.start(tickers);
+      this.simulation.stopTransport();
+      this.simulation.startTransport(tickers);
 
       // Update UI
       this._updateModeIndicators();
@@ -136,17 +129,17 @@ export class AppController {
       this._showToast("Real data mode activated");
     } else {
       // Stop transport
-      this.transport.stop();
+      this.simulation.stopTransport();
 
       // Reset tiles to simulation mode (saves real data for later)
-      this._resetPriceHistoryForMode("simulation");
       this.state.resetAllTiles(false);
+      this.tileController.resetPriceHistory("simulation");
       this.fetchingTotal = 0;
       this.fetchingCompleted = 0;
       this.fetchingJustCompleted = false;
 
       // Start simulation
-      this._startSimulation();
+      this.simulation.start();
 
       // Update UI
       this._updateModeIndicators();
@@ -164,28 +157,18 @@ export class AppController {
    * @param {string} ticker
    */
   paintTile(ticker, indexHint = undefined) {
-    const tile = this.state.getTile(ticker);
-    if (tile) {
-      tile.dirty = true;
-    }
-    this.updateScheduler.cancel(ticker);
-    this.renderer.renderTile(ticker, indexHint);
+    this.tileController.renderImmediate(ticker, indexHint);
   }
 
   /**
    * Paint all tiles
    */
   paintAll() {
-    const perfId = perfStart("paintAll");
-    try {
-      this.updateScheduler.clear();
-      this._markAllTilesDirty();
-      this.renderer.renderAll();
-      perfEnd(perfId, this.assets.length);
-    } catch (error) {
-      perfEnd(perfId);
-      throw error;
-    }
+    this.tileController.renderAll();
+  }
+
+  get priceHistory() {
+    return this.tileRegistry.priceHistory;
   }
 
   /**
@@ -200,46 +183,8 @@ export class AppController {
       const perfId = perfStart("state:tileUpdated");
 
       try {
-        const index =
-          typeof payload.index === "number"
-            ? payload.index
-            : (this.assetIndexLookup.get(ticker) ?? -1);
+        this.tileController.handleTileUpdated(payload);
 
-        const tile = this.state.getTile(ticker);
-        let historyLength = 0;
-        if (tile && tile.price != null) {
-          let history = this.priceHistory.get(ticker);
-          if (!history) {
-            history = [];
-            this.priceHistory.set(ticker, history);
-          }
-          history.push(tile.price);
-
-          // Keep only last N points
-          const excess = history.length - CONFIG.UI.HISTORY_LENGTH;
-          if (excess > 0) {
-            history.splice(0, excess);
-          }
-          historyLength = history.length;
-        }
-
-        const cached = index >= 0 ? this.tileCache.get(index) : null;
-        if (cached) {
-          if (
-            cached.needsSparklineUpdate == null ||
-            historyLength === 0 ||
-            cached.lastHistoryLength !== historyLength
-          ) {
-            cached.needsSparklineUpdate = true;
-          }
-          if (historyLength > 0) {
-            cached.lastHistoryLength = historyLength;
-          }
-        }
-
-        this.updateScheduler.request(ticker, index);
-
-        // Track fetching progress in real mode
         const mode = this.state.getMode();
         if (mode === "real") {
           this._updateFetchingProgress();
@@ -315,67 +260,6 @@ export class AppController {
    * Setup DOM element cache
    * @private
    */
-  _setupDOMCache() {
-    const tiles = document.querySelectorAll(".asset-tile");
-
-    tiles.forEach((tile, index) => {
-      const priceEl = tile.querySelector(".price");
-      const changeEl = tile.querySelector(".change");
-      const canvas = tile.querySelector(".sparkline-canvas");
-      const ctx = canvas ? canvas.getContext("2d") : null;
-      const dotEl = tile.querySelector(".status-dot");
-      if (canvas && !canvas.__ctx) {
-        canvas.__ctx = ctx;
-      }
-
-      this.tileCache.set(index, {
-        element: tile,
-        price: priceEl,
-        change: changeEl,
-        canvas,
-        ctx,
-        dot: dotEl,
-        lastPriceText: priceEl ? priceEl.textContent : null,
-        lastChangeText: changeEl ? changeEl.textContent : null,
-        lastPriceValue: null,
-        lastChangeValue: null,
-        needsSparklineUpdate: true,
-        lastHistoryLength: 0,
-        lastTileState: tile.dataset.state || "neutral",
-        lastDotState: dotEl ? dotEl.dataset.state || "" : "",
-      });
-    });
-
-    // Seed initial history for simulation placeholders
-    this._resetPriceHistoryForMode("simulation");
-  }
-
-  /**
-   * Reset price history buffer according to mode
-   * @private
-   * @param {'simulation' | 'real'} mode
-   */
-  _resetPriceHistoryForMode(mode) {
-    this.priceHistory.clear();
-
-    if (mode === "simulation") {
-      this.assets.forEach((asset) => {
-        this.priceHistory.set(asset.ticker, [asset.price]);
-      });
-    } else {
-      this.assets.forEach((asset) => {
-        this.priceHistory.set(asset.ticker, []);
-      });
-    }
-
-    if (this.tileCache) {
-      this.tileCache.forEach((cached) => {
-        cached.needsSparklineUpdate = true;
-        cached.lastHistoryLength = 0;
-      });
-    }
-  }
-
   /**
    * Setup UI event listeners
    * @private
@@ -415,11 +299,11 @@ export class AppController {
         if (this.state.getMode() === "real") {
           log.info("Restarting transport with new API key...");
           const tickers = this.assets.map((a) => a.ticker);
-          this.transport.stop();
+          this.simulation.stopTransport();
 
           // Small delay before restarting
           setTimeout(() => {
-            this.transport.start(tickers);
+            this.simulation.startTransport(tickers);
             this._showToast("Data fetching restarted");
           }, 500);
         }
@@ -452,46 +336,15 @@ export class AppController {
   }
 
   /**
-   * Update dot state for a tile
-   * @private
-   */
-  _updateDotState(cached, ticker) {
-    const dot = cached.dot || cached.element.querySelector(".status-dot");
-    if (!dot) return;
-
-    const state = this.transport.computeDotState(ticker);
-    if (!state) return;
-
-    const previous = cached.lastDotState || dot.dataset.state || "";
-
-    if (state !== previous) {
-      dot.classList.remove("standby", "open", "closed", "pulsing");
-      dot.classList.add(state);
-      dot.dataset.state = state;
-      cached.lastDotState = state;
-    }
-
-    if (state === "open") {
-      dot.classList.add("pulsing");
-    } else if (previous === "open") {
-      dot.classList.remove("pulsing");
-    }
-  }
-
-  /**
    * Render all dots
    * @private
    */
   _renderAllDots() {
-    this.renderer.refreshDots();
+    this.tileController.refreshDots();
   }
 
   // Sparkline rendering handled by TileRenderer
 
-  /**
-   * Adjust simulation update frequency and restart loop if needed
-   * @param {number} ms
-   */
   setSimulationFrequency(ms) {
     const parsed = Number.parseInt(ms, 10);
     if (Number.isNaN(parsed) || parsed <= 0) {
@@ -501,163 +354,48 @@ export class AppController {
     const clamped = Math.max(100, parsed);
     CONFIG.UI.UPDATE_FREQUENCY = clamped;
 
-    if (this.state.getMode() !== "simulation") {
-      return;
+    if (this.state.getMode() === "simulation") {
+      this.simulation.setFrequency(clamped);
+      log.info(`Simulation update frequency set to ${clamped}ms`);
     }
-
-    if (this.simulationInterval) {
-      clearInterval(this.simulationInterval);
-      this.simulationInterval = null;
-    }
-
-    this._startSimulation();
-    log.info(`Simulation update frequency set to ${clamped}ms`);
   }
 
-  /**
-   * Pause simulation updates
-   * @returns {boolean} true if paused, false if already paused or not in simulation mode
-   */
   pauseSimulation() {
     if (this.state.getMode() !== "simulation") {
       log.debug("Cannot pause - not in simulation mode");
       return false;
     }
 
-    if (!this.simulationInterval) {
+    if (!this.simulation.isRunning()) {
       log.debug("Simulation already paused");
       return false;
     }
 
-    this._stopSimulation();
+    this.simulation.stop();
     log.info("Simulation paused");
     return true;
   }
 
-  /**
-   * Resume simulation updates
-   * @returns {boolean} true if resumed, false if already running or not in simulation mode
-   */
   resumeSimulation() {
     if (this.state.getMode() !== "simulation") {
       log.debug("Cannot resume - not in simulation mode");
       return false;
     }
 
-    if (this.simulationInterval) {
+    if (this.simulation.isRunning()) {
       log.debug("Simulation already running");
       return false;
     }
 
-    this._startSimulation();
+    this.simulation.start();
     log.info("Simulation resumed");
     return true;
   }
 
-  /**
-   * Check if simulation is currently running
-   * @returns {boolean}
-   */
   isSimulationRunning() {
-    return this.state.getMode() === "simulation" && this.simulationInterval !== null;
+    return this.state.getMode() === "simulation" && this.simulation.isRunning();
   }
 
-  /**
-   * Start simulation mode
-   * @private
-   */
-  _startSimulation() {
-    if (this.simulationInterval) return;
-
-    log.info("Starting simulation...");
-
-    this.simulationInterval = setInterval(() => {
-      this._updateSimulation();
-    }, CONFIG.UI.UPDATE_FREQUENCY);
-  }
-
-  /**
-   * Stop simulation mode
-   * @private
-   */
-  _stopSimulation() {
-    if (this.simulationInterval) {
-      clearInterval(this.simulationInterval);
-      this.simulationInterval = null;
-      log.info("Simulation stopped");
-    }
-  }
-
-  /**
-   * Update simulation (random price movements)
-   * @private
-   */
-  _updateSimulation() {
-    const perfId = perfStart("updateSimulation");
-    let processed = 0;
-    const assetsLength = this.assets.length;
-    if (assetsLength === 0) {
-      perfEnd(perfId, 0);
-      return;
-    }
-
-    const now = Date.now();
-    const momentumBase = now / 10000;
-    const volatilityOscillation = Math.sin(now / 5000) * CONFIG.UI.VOLATILITY.AMPLITUDE;
-    const baseVolatility =
-      (CONFIG.UI.VOLATILITY.BASE + volatilityOscillation) * CONFIG.UI.VOLATILITY.USER_MULTIPLIER;
-
-    this.assets.forEach((asset, index) => {
-      const tile = this.state.getTile(asset.ticker);
-      if (!tile) return;
-      tile.dirty = true;
-
-      // Ensure we have base values for simulation (use placeholders)
-      if (tile.basePrice == null) {
-        tile.basePrice = tile._placeholderBasePrice;
-      }
-      if (tile.change == null) {
-        tile.change = 0;
-      }
-
-      // Simulate realistic price movements
-      const momentum = Math.sin(momentumBase + index) * 0.3;
-      const randomFactor = (Math.random() - 0.5) * 2;
-      const changeAmount = (momentum + randomFactor) * baseVolatility;
-      tile.change += changeAmount;
-
-      // Mean reversion
-      tile.change *= 0.98;
-
-      // Clamp
-      tile.change = Math.max(-10, Math.min(10, tile.change));
-
-      // Calculate price from base
-      tile.price = tile.basePrice * (1 + tile.change / 100);
-
-      if (tile.open == null) {
-        tile.open = tile._placeholderPrice;
-      }
-      if (tile.previousClose == null) {
-        tile.previousClose = tile._placeholderBasePrice;
-      }
-
-      tile.high =
-        tile.high != null ? Math.max(tile.high, tile.price) : tile.price;
-      tile.low = tile.low != null ? Math.min(tile.low, tile.price) : tile.price;
-      tile.volume = (tile.volume || 0) + Math.abs(changeAmount) * 850;
-      tile.volume = Math.min(tile.volume, 5000000);
-      tile.lastTradeTs = now;
-
-      // Mark as having info in simulation
-      tile.hasInfo = true;
-
-      // Emit tile updated event for stats
-      this.state.emit("tile:updated", { ticker: asset.ticker, index });
-      processed++;
-    });
-    perfEnd(perfId, processed);
-  }
 
   /**
    * Render all tiles
@@ -665,14 +403,6 @@ export class AppController {
    */
   _renderAll() {
     this.paintAll();
-  }
-
-  _markAllTilesDirty() {
-    this.state.getAllTiles().forEach((tile) => {
-      if (tile) {
-        tile.dirty = true;
-      }
-    });
   }
 
   /**
