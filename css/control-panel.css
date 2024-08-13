@@ -1,11 +1,7 @@
 /* Control Panel - Premium Designer Style */
 .control-panel {
   /* background: var(--panel-card-bg); */
-  background: linear-gradient(
-    135deg,
-    rgba(31, 41, 55, 0.8) 0%,
-    rgba(20, 26, 36, 0.8) 100%
-  );
+  background: var(--surface-glass-strong);
   backdrop-filter: blur(24px) saturate(180%);
   border: 1px solid var(--accent-border-medium);
   border-radius: 24px;
@@ -109,8 +105,8 @@
   font-size: 0.95rem;
   font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 2.5px;
-  background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 50%, var(--accent-tertiary) 100%);
+  letter-spacing: var(--letter-spacing-max);
+  background: var(--text-gradient-primary);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -132,7 +128,7 @@
   gap: 12px;
   font-size: 0.88rem;
   font-weight: 800;
-  letter-spacing: 1px;
+  letter-spacing: var(--letter-spacing-wide);
   color: #6ee7b7;
   padding: 12px 22px;
   background: rgba(16, 185, 129, 0.12);
@@ -191,11 +187,7 @@
   padding: 22px 24px;
   border-radius: 20px;
   border: 1px solid var(--accent-border-subtle);
-  background: linear-gradient(
-    135deg,
-    rgba(31, 41, 55, 0.78) 0%,
-    rgba(20, 26, 36, 0.78) 100%
-  );
+  background: var(--surface-glass-soft);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
   position: relative;
   overflow: visible;
@@ -211,11 +203,7 @@
   box-shadow:
     0 12px 28px rgba(0, 0, 0, 0.35),
     0 0 0 1px rgba(255, 255, 255, 0.04) inset;
-  background: linear-gradient(
-    135deg,
-    rgba(31, 41, 55, 0.82) 0%,
-    rgba(20, 26, 36, 0.82) 100%
-  );
+  background: var(--surface-glass-elevated);
   transform: translateY(-3px);
 }
 
@@ -233,11 +221,7 @@
   padding: 22px 26px;
   border-radius: 20px;
   border: 1px solid var(--accent-border-subtle);
-  background: linear-gradient(
-    135deg,
-    rgba(31, 41, 55, 0.78) 0%,
-    rgba(20, 26, 36, 0.78) 100%
-  );
+  background: var(--surface-glass-soft);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
   animation: panelCardLift 0.6s ease both;
   position: relative;
@@ -258,11 +242,7 @@
   box-shadow:
     0 12px 28px rgba(0, 0, 0, 0.32),
     0 0 0 1px rgba(255, 255, 255, 0.04) inset;
-  background: linear-gradient(
-    135deg,
-    rgba(31, 41, 55, 0.82) 0%,
-    rgba(20, 26, 36, 0.82) 100%
-  );
+  background: var(--surface-glass-elevated);
   transform: translateY(-3px);
 }
 
@@ -276,8 +256,8 @@
 .mode-title {
   font-size: 0.78rem;
   text-transform: uppercase;
-  letter-spacing: 1.5px;
-  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary), var(--accent-tertiary));
+  letter-spacing: var(--letter-spacing-extra-wide);
+  background: var(--text-gradient-triple);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -297,11 +277,7 @@
   align-items: end;
   padding: 22px 24px;
   border: 1px solid var(--accent-border-subtle);
-  background: linear-gradient(
-    135deg,
-    rgba(31, 41, 55, 0.75) 0%,
-    rgba(20, 26, 36, 0.75) 100%
-  );
+  background: var(--surface-glass-muted);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
   border-radius: 20px;
   position: relative;
@@ -372,7 +348,7 @@
 .select-trigger {
   width: 100%;
   padding: 15px 50px 15px 20px;
-  background: rgba(15, 23, 42, 0.6);
+  background: var(--surface-input-bg);
   backdrop-filter: blur(12px);
   border: 1px solid var(--accent-border-medium);
   border-radius: 16px;
@@ -521,8 +497,8 @@
   font-size: 0.78rem;
   font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 1.5px;
-  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary), var(--accent-tertiary));
+  letter-spacing: var(--letter-spacing-extra-wide);
+  background: var(--text-gradient-triple);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -541,7 +517,7 @@
 .search-input {
   width: 100%;
   padding: 15px 20px;
-  background: rgba(15, 23, 42, 0.6);
+  background: var(--surface-input-bg);
   backdrop-filter: blur(12px);
   border: 1px solid var(--accent-border-medium);
   border-radius: 16px;
@@ -556,7 +532,7 @@
 
 #api-key-input,
 #api-key-display {
-  letter-spacing: 1.5px;
+  letter-spacing: var(--letter-spacing-extra-wide);
   font-family: "SF Mono", Monaco, "Cascadia Code", monospace;
 }
 
@@ -583,7 +559,7 @@
   font-weight: 700;
   gap: 10px;
   padding: 15px 20px;
-  background: rgba(15, 23, 42, 0.6);
+  background: var(--surface-input-bg);
   backdrop-filter: blur(12px);
   border: 1px solid var(--accent-border-medium);
   border-radius: 16px;
@@ -595,7 +571,7 @@
 }
 
 .viewing-box.filtered {
-  background: rgba(251, 146, 60, 0.15);
+  background: var(--action-surface);
   border-color: var(--accent-glow-medium);
   color: #fed7aa;
 }
@@ -603,7 +579,7 @@
 .viewing-box .count {
   font-weight: 900;
   font-size: 1.2rem;
-  background: linear-gradient(135deg, var(--accent-tertiary), var(--accent-secondary), var(--accent-primary));
+  background: var(--text-gradient-reverse);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -614,11 +590,7 @@
   flex-direction: column;
   gap: 16px;
   padding: 22px 24px;
-  background: linear-gradient(
-    135deg,
-    rgba(31, 41, 55, 0.78) 0%,
-    rgba(20, 26, 36, 0.78) 100%
-  );
+  background: var(--surface-glass-soft);
   border: 1px solid var(--accent-border-subtle);
   border-radius: 20px;
   transition: all 0.4s var(--ease-smooth);
@@ -632,11 +604,7 @@
   box-shadow:
     0 10px 22px rgba(0, 0, 0, 0.24),
     0 0 0 1px rgba(255, 255, 255, 0.04) inset;
-  background: linear-gradient(
-    135deg,
-    rgba(31, 41, 55, 0.82) 0%,
-    rgba(20, 26, 36, 0.82) 100%
-  );
+  background: var(--surface-glass-elevated);
   transform: translateY(-3px);
 }
 
@@ -651,8 +619,8 @@
   font-size: 0.75rem;
   font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 1.2px;
-  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary), var(--accent-tertiary));
+  letter-spacing: var(--letter-spacing-soft-wide);
+  background: var(--text-gradient-triple);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -664,7 +632,7 @@
 .slider-value {
   font-size: 1.1rem;
   font-weight: 900;
-  background: linear-gradient(135deg, var(--accent-tertiary), var(--accent-secondary), var(--accent-primary));
+  background: var(--text-gradient-reverse);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -871,7 +839,7 @@ input[type="range"]::-moz-range-progress {
   position: absolute;
   cursor: pointer;
   inset: 0;
-  background: rgba(15, 23, 42, 0.6);
+  background: var(--surface-input-bg);
   transition: all 0.35s var(--ease-smooth);
   border-radius: 999px;
   border: 1px solid var(--accent-border-medium);
@@ -890,7 +858,7 @@ input[type="range"]::-moz-range-progress {
   width: 22px;
   height: 22px;
   transform: translateY(-50%);
-  background: linear-gradient(135deg, var(--accent-secondary), var(--accent-primary));
+  background: var(--accent-gradient-secondary-primary);
   border-radius: 50%;
   transition: all 0.35s var(--ease-smooth);
   box-shadow:
@@ -905,7 +873,7 @@ input[type="range"]::-moz-range-progress {
 }
 
 .mode-switch input:checked + .slider {
-  background: rgba(15, 23, 42, 0.7);
+  background: var(--surface-input-strong);
   border-color: var(--accent-border-strong);
   box-shadow:
     inset 0 0 0 1px var(--accent-glow-soft),
@@ -918,7 +886,7 @@ input[type="range"]::-moz-range-progress {
 
 .mode-switch input:checked + .slider::before {
   left: calc(100% - 25px);
-  background: linear-gradient(135deg, var(--accent-tertiary), var(--accent-secondary));
+  background: var(--accent-gradient-tertiary-secondary);
   box-shadow:
     0 2px 6px var(--accent-glow-medium),
     0 0 0 4px rgba(255, 255, 255, 0.12);
@@ -988,7 +956,7 @@ input[type="range"]::-moz-range-progress {
   list-style: none;
   font-size: 0.82rem;
   font-weight: 700;
-  letter-spacing: 0.8px;
+  letter-spacing: var(--letter-spacing-medium);
   color: var(--text-secondary);
   text-transform: uppercase;
   user-select: none;
@@ -1086,7 +1054,7 @@ input[type="range"]::-moz-range-progress {
   font-size: 0.78rem;
   font-weight: 700;
   color: rgba(148, 163, 184, 0.85);
-  letter-spacing: 0.9px;
+  letter-spacing: var(--letter-spacing-midwide);
   text-transform: uppercase;
   padding-left: 4px;
 }
@@ -1098,7 +1066,7 @@ input[type="range"]::-moz-range-progress {
   padding: 15px 20px;
   border-radius: 16px;
   border: 1px solid var(--accent-border-medium);
-  background: rgba(15, 23, 42, 0.6);
+  background: var(--surface-input-bg);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
   transition:
     border-color 0.3s var(--ease-smooth),
@@ -1120,7 +1088,7 @@ input[type="range"]::-moz-range-progress {
   color: var(--text-primary);
   font-size: 0.92rem;
   font-family: inherit;
-  letter-spacing: 0.2px;
+  letter-spacing: var(--letter-spacing-slight);
   padding: 0;
 }
 
@@ -1171,18 +1139,18 @@ input[type="range"]::-moz-range-progress {
 .api-save-btn {
   min-width: 130px;
   padding: 13px 28px;
-  background: linear-gradient(135deg, #fb923c, #f87171);
+  background: var(--accent-gradient-hot);
   border: 1px solid rgba(251, 146, 60, 0.3);
   color: #fff;
   box-shadow: 0 4px 12px rgba(251, 146, 60, 0.25);
   font-size: 0.86rem;
-  letter-spacing: 0.5px;
+  letter-spacing: var(--letter-spacing-compact);
   text-transform: uppercase;
   font-weight: 900;
 }
 
 .api-save-btn:hover {
-  background: linear-gradient(135deg, #fbbf24, #fb923c);
+  background: var(--accent-gradient-warm);
   transform: translateY(-2px);
   border-color: rgba(251, 191, 36, 0.4);
 }
@@ -1193,8 +1161,8 @@ input[type="range"]::-moz-range-progress {
 
 .api-copy-btn,
 .api-visibility-btn {
-  background: rgba(248, 113, 113, 0.15);
-  border: 1px solid rgba(248, 113, 113, 0.25);
+  background: var(--action-surface);
+  border: 1px solid var(--action-border);
   color: #fecaca;
   font-size: 0.88rem;
   font-weight: 700;
@@ -1203,7 +1171,7 @@ input[type="range"]::-moz-range-progress {
 
 .api-copy-btn:hover,
 .api-visibility-btn:hover {
-  background: rgba(251, 146, 60, 0.2);
+  background: var(--action-surface-hover);
   transform: translateY(-1px);
   border-color: var(--accent-glow-medium);
 }
@@ -1257,7 +1225,7 @@ input[type="range"]::-moz-range-progress {
   color: var(--text-primary);
   font-size: 0.85rem;
   font-weight: 700;
-  letter-spacing: 0.5px;
+  letter-spacing: var(--letter-spacing-compact);
   backdrop-filter: blur(15px);
 }
 
@@ -1311,7 +1279,7 @@ input[type="range"]::-moz-range-progress {
 @media (max-width: 480px) {
   .control-panel-title {
     font-size: 0.75rem;
-    letter-spacing: 1px;
+    letter-spacing: var(--letter-spacing-wide);
   }
 
   .search-input,

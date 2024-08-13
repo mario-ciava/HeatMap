@@ -80,7 +80,7 @@
 .add-tile-title {
   font-size: 0.85rem;
   font-weight: 700;
-  letter-spacing: 1.5px;
+  letter-spacing: var(--letter-spacing-extra-wide);
   text-transform: uppercase;
   color: var(--accent-secondary);
   transition: color 0.3s ease;
@@ -93,7 +93,7 @@
 .add-tile-subtitle {
   font-size: 0.7rem;
   font-weight: 600;
-  letter-spacing: 1px;
+  letter-spacing: var(--letter-spacing-wide);
   text-transform: uppercase;
   color: rgba(148, 163, 184, 0.7);
   transition: color 0.3s ease;
@@ -111,11 +111,7 @@
   padding: 24px;
   border-radius: 15px;
   border: 1px solid var(--accent-border-medium);
-  background: linear-gradient(
-    135deg,
-    rgba(31, 41, 55, 0.8) 0%,
-    rgba(20, 26, 36, 0.8) 100%
-  );
+  background: var(--surface-glass-strong);
   box-shadow:
     0 10px 40px rgba(0, 0, 0, 0.4),
     0 0 0 1px var(--accent-glow-soft) inset;
@@ -309,7 +305,7 @@ body[data-theme="monochrome"] .asset-tile.losing-strong {
   font-size: 0.82rem;
   font-weight: 700;
   color: rgba(255, 255, 255, 0.95);
-  letter-spacing: 0.8px;
+  letter-spacing: var(--letter-spacing-medium);
   text-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
   margin-bottom: 4px;
 }
@@ -324,7 +320,7 @@ body[data-theme="monochrome"] .asset-tile.gaining-strong .ticker {
   font-size: 1.12rem;
   font-weight: 700;
   color: rgba(255, 255, 255, 0.98);
-  letter-spacing: -0.3px;
+  letter-spacing: var(--letter-spacing-narrow);
   text-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
 }
 
@@ -375,7 +371,7 @@ body[data-theme="monochrome"] .asset-tile.gaining-strong .price {
   @container asset-card (min-width: 180px) {
     .ticker {
       font-size: 0.95rem;
-      letter-spacing: 1px;
+      letter-spacing: var(--letter-spacing-wide);
       margin-bottom: 6px;
     }
 
@@ -400,7 +396,7 @@ body[data-theme="monochrome"] .asset-tile.gaining-strong .price {
 
     .add-tile-title {
       font-size: 0.95rem;
-      letter-spacing: 1.6px;
+      letter-spacing: var(--letter-spacing-expanded);
     }
 
     .add-tile-subtitle {

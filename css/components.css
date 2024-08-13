@@ -36,7 +36,7 @@
   background:
     radial-gradient(120% 160% at 15% 5%, rgba(255, 255, 255, 0.08), transparent 60%),
     radial-gradient(140% 200% at 85% 10%, var(--accent-glow-soft), transparent 65%),
-    linear-gradient(135deg, rgba(31, 41, 55, 0.82) 0%, rgba(20, 26, 36, 0.78) 100%);
+    var(--surface-glass-elevated-soft);
   border: 1px solid var(--accent-border-medium);
   border-radius: 18px;
   box-shadow:
@@ -56,7 +56,7 @@
   background:
     radial-gradient(120% 160% at 15% 5%, rgba(255, 255, 255, 0.04), transparent 50%),
     radial-gradient(140% 200% at 85% 10%, var(--accent-glow-soft), transparent 60%),
-    linear-gradient(135deg, rgba(31, 41, 55, 0.94) 0%, rgba(20, 26, 36, 0.92) 100%);
+    var(--surface-glass-rich);
   backdrop-filter: blur(12px);
 }
 
@@ -67,7 +67,7 @@
 
 .modal-content::-webkit-scrollbar-track,
 .add-ticker-modal::-webkit-scrollbar-track {
-  background: rgba(15, 23, 42, 0.6);
+  background: var(--surface-input-bg);
   border-radius: 10px;
   margin: 6px;
 }
@@ -113,16 +113,11 @@
   font-size: 2.2rem;
   font-weight: 700;
   margin-bottom: 8px;
-  background: linear-gradient(
-    135deg,
-    var(--accent-primary) 0%,
-    var(--accent-secondary) 50%,
-    var(--accent-tertiary) 100%
-  );
+  background: var(--text-gradient-primary);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
-  letter-spacing: -0.5px;
+  letter-spacing: var(--letter-spacing-tight);
 }
 
 .modal-name {
@@ -146,8 +141,8 @@
   gap: 6px;
   padding: 14px 18px;
   background:
-    radial-gradient(circle at top left, rgba(255, 255, 255, 0.06), transparent 55%),
-    linear-gradient(135deg, rgba(31, 41, 55, 0.82) 0%, rgba(20, 26, 36, 0.82) 100%),
+    var(--surface-highlight-soft),
+    var(--surface-glass-elevated),
     var(--panel-field-bg);
   border-radius: 12px;
   border: 1px solid var(--panel-field-border);
@@ -171,7 +166,7 @@
   color: var(--panel-text-muted);
   font-size: 0.8rem;
   font-weight: 600;
-  letter-spacing: 1px;
+  letter-spacing: var(--letter-spacing-wide);
   text-transform: uppercase;
 }
 
@@ -185,8 +180,8 @@
   margin-top: 24px;
   padding: 20px;
   background:
-    radial-gradient(circle at top left, rgba(255, 255, 255, 0.08), transparent 60%),
-    linear-gradient(135deg, rgba(31, 41, 55, 0.82) 0%, rgba(20, 26, 36, 0.82) 100%),
+    var(--surface-highlight-medium),
+    var(--surface-glass-elevated),
     var(--panel-card-bg);
   border: 1px solid var(--panel-field-border);
   border-radius: 14px;
@@ -199,7 +194,7 @@
   color: var(--text-secondary);
   margin-bottom: 12px;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: var(--letter-spacing-compact);
 }
 
 .modal-chart-wrapper {
@@ -359,11 +354,7 @@
   top: 28px;
   left: 50%;
   transform: translateX(-50%) translateY(-140px);
-  background: linear-gradient(
-    135deg,
-    rgba(31, 41, 55, 0.98) 0%,
-    rgba(20, 26, 36, 0.98) 100%
-  );
+  background: var(--surface-glass-intense);
   backdrop-filter: blur(20px);
   border: 1px solid var(--accent-border-medium);
   border-radius: 12px;
@@ -377,7 +368,7 @@
     0 0 0 1px var(--accent-glow-soft) inset;
   font-weight: 700;
   font-size: 0.94rem;
-  letter-spacing: 0.5px;
+  letter-spacing: var(--letter-spacing-compact);
 }
 
 .toast.show {
@@ -405,11 +396,7 @@
 
 .control-btn {
   padding: 14px 28px;
-  background: linear-gradient(
-    135deg,
-    rgba(31, 41, 55, 0.8) 0%,
-    rgba(20, 26, 36, 0.8) 100%
-  );
+  background: var(--surface-glass-strong);
   backdrop-filter: blur(24px) saturate(180%);
   border: 1px solid var(--accent-border-medium);
   border-radius: 16px;
@@ -418,7 +405,7 @@
   transition: all 0.4s var(--ease-smooth);
   font-size: 0.92rem;
   font-weight: 700;
-  letter-spacing: 0.5px;
+  letter-spacing: var(--letter-spacing-compact);
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
   box-shadow:
     0 10px 28px rgba(0, 0, 0, 0.35),
@@ -428,11 +415,7 @@
 }
 
 .control-btn:hover {
-  background: linear-gradient(
-    135deg,
-    rgba(31, 41, 55, 0.9) 0%,
-    rgba(20, 26, 36, 0.9) 100%
-  );
+  background: var(--surface-glass-hover);
   border-color: var(--accent-glow-medium);
   transform: translateY(-4px);
   box-shadow:
@@ -496,11 +479,7 @@
   padding: 20px;
   border-radius: 15px;
   border: 1px solid var(--accent-border-medium);
-  background: linear-gradient(
-    135deg,
-    rgba(31, 41, 55, 0.8) 0%,
-    rgba(20, 26, 36, 0.8) 100%
-  );
+  background: var(--surface-glass-strong);
   box-shadow:
     0 10px 40px rgba(0, 0, 0, 0.4),
     0 0 0 1px var(--accent-glow-soft) inset;
@@ -531,7 +510,7 @@
   text-transform: uppercase;
   color: var(--text-secondary);
   font-weight: 700;
-  letter-spacing: 1px;
+  letter-spacing: var(--letter-spacing-wide);
 }
 
 .stat-value {
@@ -557,11 +536,11 @@
   font-size: 2.2rem;
   font-weight: 700;
   margin-bottom: 8px;
-  background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 50%, var(--accent-tertiary) 100%);
+  background: var(--text-gradient-primary);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
-  letter-spacing: -0.5px;
+  letter-spacing: var(--letter-spacing-tight);
 }
 
 .add-ticker-header p {
@@ -582,7 +561,7 @@
   font-size: 0.78rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 1.3px;
+  letter-spacing: var(--letter-spacing-between-wide);
   color: var(--panel-text-muted);
   display: flex;
   align-items: center;
@@ -599,8 +578,8 @@
   flex: 1;
   padding: 14px 18px;
   background:
-    radial-gradient(circle at top left, rgba(255, 255, 255, 0.08), transparent 60%),
-    linear-gradient(135deg, rgba(31, 41, 55, 0.82) 0%, rgba(20, 26, 36, 0.82) 100%),
+    var(--surface-highlight-medium),
+    var(--surface-glass-elevated),
     var(--panel-card-bg);
   backdrop-filter: blur(10px);
   border: 1px solid var(--panel-field-border);
@@ -621,8 +600,8 @@
 .add-ticker-field input:hover {
   border-color: var(--panel-field-border-hover);
   background:
-    radial-gradient(circle at top left, rgba(255, 255, 255, 0.10), transparent 60%),
-    linear-gradient(135deg, rgba(31, 41, 55, 0.82) 0%, rgba(20, 26, 36, 0.82) 100%),
+    var(--surface-highlight-strong),
+    var(--surface-glass-elevated),
     var(--panel-card-bg);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
@@ -631,8 +610,8 @@
   outline: none;
   border-color: var(--panel-field-border-hover);
   background:
-    radial-gradient(circle at top left, rgba(255, 255, 255, 0.12), transparent 60%),
-    linear-gradient(135deg, rgba(31, 41, 55, 0.82) 0%, rgba(20, 26, 36, 0.82) 100%),
+    var(--surface-highlight-intense),
+    var(--surface-glass-elevated),
     var(--panel-card-bg);
   box-shadow:
     0 0 0 1px var(--panel-field-border-hover),
@@ -642,8 +621,8 @@
 .add-ticker-field button {
   padding: 14px 28px;
   background:
-    linear-gradient(135deg, rgba(31, 41, 55, 0.85), rgba(20, 26, 36, 0.82)),
-    radial-gradient(circle at top left, rgba(255, 255, 255, 0.05), transparent 60%),
+    var(--surface-glint-linear),
+    var(--surface-highlight-glint),
     var(--panel-card-bg);
   backdrop-filter: blur(15px);
   border: 1px solid var(--accent-border-medium);
@@ -653,7 +632,7 @@
   transition: all 0.4s var(--ease-standard);
   font-size: 0.92rem;
   font-weight: 700;
-  letter-spacing: 0.5px;
+  letter-spacing: var(--letter-spacing-compact);
   box-shadow:
     0 4px 12px rgba(0, 0, 0, 0.2),
     0 0 0 1px rgba(255, 255, 255, 0.02) inset;
@@ -662,7 +641,7 @@
 
 .add-ticker-field button:hover {
   background:
-    linear-gradient(135deg, var(--accent-glow-medium) 0%, rgba(255, 255, 255, 0.08) 100%),
+    var(--surface-glint-accent),
     var(--panel-card-bg);
   border-color: var(--accent-glow-medium);
   transform: translateY(-3px);
@@ -683,8 +662,8 @@
   min-height: 200px;
   padding: 20px;
   background:
-    radial-gradient(circle at top left, rgba(255, 255, 255, 0.08), transparent 60%),
-    linear-gradient(135deg, rgba(31, 41, 55, 0.82) 0%, rgba(20, 26, 36, 0.82) 100%),
+    var(--surface-highlight-medium),
+    var(--surface-glass-elevated),
     var(--panel-card-bg);
   border: 1px solid var(--panel-field-border);
   border-radius: 14px;

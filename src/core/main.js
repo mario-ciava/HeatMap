@@ -7,6 +7,9 @@ import { AppController } from "../services/AppController.js";
 import { CONFIG } from "../config.js";
 import { logger } from "../utils/Logger.js";
 import { perfMonitor, perfReport } from "../utils/PerfMonitor.js";
+import { ControlPanelView } from '../ui/views/ControlPanelView.js';
+import { HeatmapView } from '../ui/views/HeatmapView.js';
+import { ModalView } from '../ui/views/ModalView.js';
 
 const log = logger.child("Main");
 const isPerfEnabled = () =>
@@ -500,221 +503,6 @@ function formatRelativeTime(timestamp) {
   return date.toLocaleDateString([], { month: "short", day: "numeric" });
 }
 
-const enhancedSelectWrappers = new Set();
-let openCustomSelect = null;
-
-function closeAllCustomSelects(except) {
-  enhancedSelectWrappers.forEach((wrapper) => {
-    if (wrapper !== except && wrapper.classList.contains("open")) {
-      wrapper._close?.({ focusTrigger: false });
-    }
-  });
-}
-
-function enhanceDropdown(select) {
-  if (!select || select.dataset.enhanced === "true") return;
-
-  const parent = select.parentElement;
-  if (!parent) return;
-
-  const wrapper = document.createElement("div");
-  wrapper.className = "custom-select";
-
-  const dropdownId = `${select.id || `select-${Math.random().toString(36).slice(2)}`}-menu`;
-
-  const trigger = document.createElement("button");
-  trigger.type = "button";
-  trigger.className = "select-trigger";
-  trigger.setAttribute("aria-haspopup", "listbox");
-  trigger.setAttribute("aria-expanded", "false");
-  trigger.setAttribute("aria-controls", dropdownId);
-
-  const dropdown = document.createElement("div");
-  dropdown.className = "select-dropdown";
-  dropdown.id = dropdownId;
-  dropdown.setAttribute("role", "listbox");
-
-  const optionButtons = [];
-
-  const buildOptionButton = (option, index) => {
-    const optionBtn = document.createElement("button");
-    optionBtn.type = "button";
-    optionBtn.className = "select-option";
-    optionBtn.dataset.value = option.value;
-    optionBtn.setAttribute("role", "option");
-    optionBtn.textContent = option.textContent;
-    optionBtn.tabIndex = -1;
-    optionBtn.setAttribute("aria-selected", option.selected ? "true" : "false");
-
-    optionBtn.addEventListener("click", () => {
-      if (select.value !== option.value) {
-        select.value = option.value;
-        select.dispatchEvent(new Event("change", { bubbles: true }));
-      } else {
-        updateSelection();
-      }
-      closeDropdown();
-    });
-
-    optionBtn.addEventListener("keydown", (event) => {
-      const currentIndex = optionButtons.indexOf(optionBtn);
-
-      if (event.key === "ArrowDown") {
-        event.preventDefault();
-        const nextIndex = (currentIndex + 1) % optionButtons.length;
-        optionButtons[nextIndex].focus();
-        scrollOptionIntoView(optionButtons[nextIndex]);
-      } else if (event.key === "ArrowUp") {
-        event.preventDefault();
-        const prevIndex =
-          (currentIndex - 1 + optionButtons.length) % optionButtons.length;
-        optionButtons[prevIndex].focus();
-        scrollOptionIntoView(optionButtons[prevIndex]);
-      } else if (event.key === "Home") {
-        event.preventDefault();
-        optionButtons[0].focus();
-        scrollOptionIntoView(optionButtons[0]);
-      } else if (event.key === "End") {
-        event.preventDefault();
-        const last = optionButtons[optionButtons.length - 1];
-        last.focus();
-        scrollOptionIntoView(last);
-      } else if (event.key === "Enter" || event.key === " ") {
-        event.preventDefault();
-        optionBtn.click();
-      } else if (event.key === "Escape") {
-        event.preventDefault();
-        closeDropdown();
-      } else if (event.key === "Tab") {
-        closeDropdown({ focusTrigger: false });
-      }
-    });
-
-    dropdown.appendChild(optionBtn);
-    optionButtons.push(optionBtn);
-  };
-
-  Array.from(select.options).forEach(buildOptionButton);
-
-  parent.insertBefore(wrapper, select);
-  wrapper.appendChild(trigger);
-  wrapper.appendChild(dropdown);
-  wrapper.appendChild(select);
-
-  select.classList.add("select-native");
-  select.dataset.enhanced = "true";
-  select.setAttribute("aria-hidden", "true");
-
-  const updateSelection = () => {
-    const selectedOption = select.options[select.selectedIndex];
-    trigger.textContent = selectedOption
-      ? selectedOption.textContent
-      : "Select";
-
-    optionButtons.forEach((button) => {
-      const isSelected = button.dataset.value === select.value;
-      button.classList.toggle("selected", isSelected);
-      button.setAttribute("aria-selected", isSelected ? "true" : "false");
-    });
-  };
-
-  const scrollOptionIntoView = (button) => {
-    const buttonTop = button.offsetTop;
-    const buttonHeight = button.offsetHeight;
-    const viewTop = dropdown.scrollTop;
-    const viewBottom = viewTop + dropdown.clientHeight;
-
-    if (buttonTop < viewTop) {
-      dropdown.scrollTop = buttonTop;
-    } else if (buttonTop + buttonHeight > viewBottom) {
-      dropdown.scrollTop = buttonTop - dropdown.clientHeight + buttonHeight;
-    }
-  };
-
-  const closeDropdown = ({ focusTrigger = true } = {}) => {
-    if (!wrapper.classList.contains("open")) return;
-    wrapper.classList.remove("open");
-    trigger.setAttribute("aria-expanded", "false");
-    optionButtons.forEach((button) => (button.tabIndex = -1));
-    if (focusTrigger) {
-      trigger.focus({ preventScroll: true });
-    }
-    if (openCustomSelect === wrapper) {
-      openCustomSelect = null;
-    }
-  };
-
-  const openDropdown = () => {
-    if (wrapper.classList.contains("open")) return;
-    closeAllCustomSelects(wrapper);
-    wrapper.classList.add("open");
-    trigger.setAttribute("aria-expanded", "true");
-    optionButtons.forEach((button) => (button.tabIndex = 0));
-    const selectedBtn =
-      optionButtons.find((btn) => btn.dataset.value === select.value) ||
-      optionButtons[0];
-    if (selectedBtn) {
-      selectedBtn.focus();
-      scrollOptionIntoView(selectedBtn);
-    }
-    openCustomSelect = wrapper;
-  };
-
-  wrapper._close = closeDropdown;
-
-  trigger.addEventListener("click", (event) => {
-    event.preventDefault();
-    if (wrapper.classList.contains("open")) {
-      closeDropdown();
-    } else {
-      openDropdown();
-    }
-  });
-
-  trigger.addEventListener("keydown", (event) => {
-    if (["Enter", " ", "ArrowDown", "ArrowUp"].includes(event.key)) {
-      event.preventDefault();
-      openDropdown();
-    }
-  });
-
-  wrapper.addEventListener("focusout", (event) => {
-    if (!wrapper.contains(event.relatedTarget)) {
-      closeDropdown({ focusTrigger: false });
-    }
-  });
-
-  select.addEventListener("change", updateSelection);
-  select.addEventListener("focus", () => {
-    trigger.focus({ preventScroll: true });
-    openDropdown();
-  });
-
-  const associatedLabel = parent.querySelector(`label[for="${select.id}"]`);
-  if (associatedLabel) {
-    associatedLabel.addEventListener("click", (event) => {
-      event.preventDefault();
-      trigger.focus({ preventScroll: true });
-      openDropdown();
-    });
-  }
-
-  updateSelection();
-  enhancedSelectWrappers.add(wrapper);
-}
-
-document.addEventListener("pointerdown", (event) => {
-  if (openCustomSelect && !openCustomSelect.contains(event.target)) {
-    openCustomSelect._close?.({ focusTrigger: false });
-  }
-});
-
-document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && openCustomSelect) {
-    openCustomSelect._close?.();
-  }
-});
-
 const addTickerModal = document.getElementById("add-ticker-modal");
 const addTickerClose = document.getElementById("add-ticker-close");
 const addTickerForm = document.getElementById("add-ticker-form");
@@ -726,7 +514,7 @@ function openAddTickerModal() {
   addTickerModal.classList.add("active");
   document.documentElement.style.overflow = "hidden";
   setTimeout(() => addTickerInput?.focus({ preventScroll: true }), 120);
-  closeAllCustomSelects();
+  controlPanelView?.closeAllCustomSelects();
 }
 
 function closeAddTickerModal() {
@@ -774,7 +562,9 @@ document.addEventListener("keydown", (event) => {
 // ============================================================================
 
 let app = null;
-let statsUpdateScheduled = false;
+let controlPanelView = null;
+let heatmapView = null;
+let modalView = null;
 
 // ============================================================================
 // Initialization
@@ -789,83 +579,47 @@ function initHeatmap() {
     return;
   }
 
-  // Clear existing content
   heatmapContainer.innerHTML = "";
 
-  // Create tiles
-  assets.forEach((asset, index) => {
-    const tile = document.createElement("div");
-    tile.className = "asset-tile neutral tile-enter";
-    tile.dataset.index = index;
-    tile.dataset.state = "neutral";
-    tile.style.animationDelay = `${index * 0.03}s`;
-
-    const canvas = document.createElement("canvas");
-    canvas.className = "sparkline-canvas";
-    canvas.width = 120;
-    canvas.height = 25;
-
-    tile.innerHTML = `
-      <div class="ticker">${asset.ticker}</div>
-      <div class="price">$${asset.price.toFixed(2)}</div>
-      <div class="change">${asset.change.toFixed(2)}%</div>
-      <span class="status-dot standby" aria-hidden="true"></span>
-    `;
-
-    tile.insertBefore(canvas, tile.firstChild);
-
-    tile.addEventListener("animationend", (event) => {
-      if (event.animationName === "tileEntry") {
-        tile.classList.remove("tile-enter");
-      }
-    });
-
-    // Add click handler for modal
-    tile.addEventListener("click", () => showAssetDetails(index));
-
-    heatmapContainer.appendChild(tile);
+  modalView = new ModalView(assets, {
+    formatPrice,
+    formatPercent,
+    formatVolume,
+    formatRelativeTime,
   });
+  modalView.init();
 
-  // Create add tile button
-  const addTile = document.createElement("div");
-  addTile.className = "asset-tile add-tile tile-enter";
-  addTile.style.animationDelay = `${assets.length * 0.03}s`;
-  addTile.innerHTML = `
-    <div class="add-tile-icon">+</div>
-    <div class="add-tile-text">
-      <span class="add-tile-title">Add</span>
-      <span class="add-tile-subtitle">ticker</span>
-    </div>
-  `;
-  addTile.addEventListener("click", () => {
-    openAddTickerModal();
+  heatmapView = new HeatmapView(null, assets, modalView, {
+    openAddTickerModal,
   });
-  addTile.addEventListener("animationend", (event) => {
-    if (event.animationName === "tileEntry") {
-      addTile.classList.remove("tile-enter");
-    }
-  });
-  heatmapContainer.appendChild(addTile);
+  heatmapView.buildHeatmap(heatmapContainer);
 
-  // Initialize app controller
   app = new AppController(assets);
   app.init();
 
-  // Listen for tile updates to refresh statistics and modal
+  modalView.setApp(app);
+  heatmapView.setApp(app);
+
+  const controlHelpers = {
+    debounce,
+    showToast,
+    toggleAnimation,
+    simulateMarketCrash,
+    simulateBullRun,
+    resetMarket,
+    exportToCSV,
+    cycleTheme,
+    closeModal: () => modalView.closeModal(),
+  };
+
+  controlPanelView = new ControlPanelView(app, assets, controlHelpers);
+  controlPanelView.init();
+  controlPanelView.updateStats();
+
   app.state.on("tile:updated", () => {
-    scheduleStatsUpdate();
-    updateModalIfOpen();
+    controlPanelView.scheduleStatsUpdate();
+    modalView.updateModalIfOpen();
   });
-
-  // Setup remaining UI features
-  setupFiltersAndSearch();
-  setupSliders();
-  setupThemes();
-  setupKeyboardShortcuts();
-  setupButtons();
-
-  // Initial stats update
-  updateStats();
 
   log.info("Heatmap initialized successfully");
   showToast("Heatmap loaded");
@@ -876,774 +630,51 @@ function initHeatmap() {
 // ============================================================================
 
 function setupFiltersAndSearch() {
-  const search = document.getElementById("asset-search");
-  const filterSelect = document.getElementById("filter-select");
-  const sortSelect = document.getElementById("sort-select");
-
-  enhanceDropdown(filterSelect);
-  enhanceDropdown(sortSelect);
-
-  if (search) {
-    search.addEventListener("input", debounce(applyFilters, 300));
-  }
-
-  if (filterSelect) {
-    filterSelect.addEventListener("change", applyFilters);
-  }
-
-  if (sortSelect) {
-    sortSelect.addEventListener("change", applyFilters);
-  }
+  // handled by ControlPanelView
 }
 
 function applyFilters() {
-  const perfId = perfStart("applyFilters");
-  let processed = 0;
-  try {
-    const searchTerm =
-      document.getElementById("asset-search")?.value.toLowerCase() || "";
-    const filter = document.getElementById("filter-select")?.value || "all";
-    const sort = document.getElementById("sort-select")?.value || "default";
-
-    const tiles = Array.from(
-      document.querySelectorAll(".asset-tile:not(.add-tile)"),
-    );
-
-    tiles.forEach((tile) => {
-      processed++;
-      const index = parseInt(tile.dataset.index);
-      if (isNaN(index)) return; // Skip tiles without valid index
-
-      const asset = assets[index];
-      if (!asset) return; // Skip if asset not found
-
-      const tileState = app.state.getTile(asset.ticker);
-
-      let show = true;
-
-      // Search filter
-      if (searchTerm) {
-        show =
-          asset.ticker.toLowerCase().includes(searchTerm) ||
-          asset.name.toLowerCase().includes(searchTerm) ||
-          asset.sector.toLowerCase().includes(searchTerm);
-      }
-
-      // Category filter
-      if (show) {
-        const change = tileState?.change || 0;
-        switch (filter) {
-          case "gaining":
-            show = change > CONFIG.UI.THRESHOLDS.MILD_GAIN;
-            break;
-          case "losing":
-            show = change < CONFIG.UI.THRESHOLDS.MILD_LOSS;
-            break;
-          case "neutral":
-            show =
-              change >= CONFIG.UI.THRESHOLDS.MILD_LOSS &&
-              change <= CONFIG.UI.THRESHOLDS.MILD_GAIN;
-            break;
-        }
-      }
-
-      tile.classList.toggle("hidden", !show);
-    });
-
-    // Apply sorting
-    applySorting(sort);
-
-    // Update stats
-    updateStats();
-  } finally {
-    perfEnd(perfId, Math.max(processed, 1));
-  }
+  controlPanelView?.applyFilters();
 }
-
 function applySorting(sortType) {
-  const perfId = perfStart("applySorting");
-  let processed = 0;
-  try {
-    const container = document.getElementById("heatmap");
-    const allTiles = Array.from(container.children);
-
-    // Separate add-tile from regular tiles
-    const addTile = allTiles.find((t) => t.classList.contains("add-tile"));
-    const tiles = allTiles.filter((t) => !t.classList.contains("add-tile"));
-
-    tiles.sort((a, b) => {
-      processed++;
-      const indexA = parseInt(a.dataset.index);
-      const indexB = parseInt(b.dataset.index);
-
-      // Handle invalid indices
-      if (isNaN(indexA) || isNaN(indexB)) return 0;
-
-      const assetA = assets[indexA];
-      const assetB = assets[indexB];
-
-      // Handle missing assets
-      if (!assetA || !assetB) return 0;
-
-      const tileA = app.state.getTile(assetA.ticker);
-      const tileB = app.state.getTile(assetB.ticker);
-
-      switch (sortType) {
-        case "change-desc":
-          return (tileB?.change || 0) - (tileA?.change || 0);
-        case "change-asc":
-          return (tileA?.change || 0) - (tileB?.change || 0);
-        case "price-desc":
-          return (tileB?.price || 0) - (tileA?.price || 0);
-        case "price-asc":
-          return (tileA?.price || 0) - (tileB?.price || 0);
-        case "ticker":
-          return assetA.ticker.localeCompare(assetB.ticker);
-        default:
-          return indexA - indexB;
-      }
-    });
-
-    // Re-append tiles in sorted order
-    tiles.forEach((tile) => container.appendChild(tile));
-
-    // Always append add-tile at the end
-    if (addTile) {
-      container.appendChild(addTile);
-    }
-  } finally {
-    perfEnd(perfId, Math.max(processed, 1));
-  }
+  controlPanelView?.applySorting(sortType);
 }
 
 function scheduleStatsUpdate() {
-  if (statsUpdateScheduled) return;
-  statsUpdateScheduled = true;
-  requestAnimationFrame(() => {
-    statsUpdateScheduled = false;
-    updateStats();
-  });
+  controlPanelView?.scheduleStatsUpdate();
 }
 
 function updateStats() {
-  const perfId = perfStart("updateStats");
-  let sampleCount = 0;
-  let gaining = 0;
-  let losing = 0;
-  let totalChange = 0;
-  const changes = [];
-
-  try {
-    const tiles = document.querySelectorAll(
-      ".asset-tile:not(.hidden):not(.add-tile)",
-    );
-    sampleCount = tiles.length;
-
-    tiles.forEach((tile) => {
-      const index = parseInt(tile.dataset.index);
-      if (isNaN(index)) return; // Skip tiles without valid index
-
-      const asset = assets[index];
-      if (!asset) return; // Skip if asset not found
-
-      const tileState = app.state.getTile(asset.ticker);
-      const change = tileState?.change || 0;
-
-      if (change > CONFIG.UI.THRESHOLDS.MILD_GAIN) gaining++;
-      else if (change < CONFIG.UI.THRESHOLDS.MILD_LOSS) losing++;
-
-      totalChange += change;
-      changes.push(Math.abs(change));
-    });
-
-    const count = sampleCount || 1;
-
-    document.getElementById("gaining").textContent = gaining;
-    document.getElementById("losing").textContent = losing;
-    document.getElementById("totalAssets").textContent = count;
-
-    const marketTemp = (((gaining - losing) / count) * 50).toFixed(1);
-    const tempEl = document.getElementById("marketTemp");
-    tempEl.textContent = `${marketTemp}°C`;
-    tempEl.className = `stat-value ${marketTemp > 10 ? "positive" : marketTemp < -10 ? "negative" : "neutral"}`;
-
-    // Volatility: average of absolute changes (represents actual market movement)
-    const volatility = (
-      changes.reduce((sum, val) => sum + val, 0) / count
-    ).toFixed(2);
-    document.getElementById("volatility").textContent = `${volatility}%`;
-
-    // Average Change: net average (can be positive or negative)
-    const avgChange = (totalChange / count).toFixed(2);
-    const avgEl = document.getElementById("avgChange");
-    avgEl.textContent = `${avgChange > 0 ? "+" : ""}${avgChange}%`;
-    avgEl.className = `stat-value ${avgChange > 0 ? "positive" : avgChange < 0 ? "negative" : "neutral"}`;
-  } finally {
-    perfEnd(perfId, Math.max(sampleCount, 1));
-  }
+  controlPanelView?.updateStats();
 }
 
 function setupSliders() {
-  // Volatility slider (simulation mode only)
-  const volatilitySlider = document.getElementById("volatility-slider");
-  const volatilityValue = document.getElementById("volatility-value");
-
-  if (volatilitySlider && volatilityValue) {
-    const updateVolatilitySlider = (slider) => {
-      const value = parseFloat(slider.value);
-      const min = parseFloat(slider.min);
-      const max = parseFloat(slider.max);
-      const progress = ((value - min) / (max - min)) * 100;
-      slider.style.setProperty("--slider-progress", `${progress}%`);
-    };
-
-    // Initialize on load
-    updateVolatilitySlider(volatilitySlider);
-
-    volatilitySlider.addEventListener("input", (e) => {
-      const value = parseFloat(e.target.value);
-      CONFIG.UI.VOLATILITY.USER_MULTIPLIER = value;
-      volatilityValue.textContent = `${value.toFixed(2)}x`;
-
-      updateVolatilitySlider(e.target);
-
-      showToast(`Volatility: ${value.toFixed(2)}x`);
-    });
-  }
-
-  // Speed slider (simulation mode only)
-  const speedSlider = document.getElementById("speed-slider");
-  const speedValue = document.getElementById("speed-value");
-
-  if (speedSlider && speedValue) {
-    const updateSpeedSlider = (slider) => {
-      const value = parseInt(slider.value);
-      const min = parseInt(slider.min);
-      const max = parseInt(slider.max);
-      const progress = ((value - min) / (max - min)) * 100;
-      slider.style.setProperty("--slider-progress", `${progress}%`);
-    };
-
-    // Initialize on load
-    updateSpeedSlider(speedSlider);
-
-    speedSlider.addEventListener("input", (e) => {
-      const value = parseInt(e.target.value);
-      if (app && typeof app.setSimulationFrequency === "function") {
-        app.setSimulationFrequency(value);
-      } else {
-        CONFIG.UI.UPDATE_FREQUENCY = value;
-      }
-      speedValue.textContent = `${value}ms`;
-
-      updateSpeedSlider(e.target);
-
-      showToast(`Update delay: ${value}ms`);
-    });
-  }
+  // handled by ControlPanelView
 }
-
 function setupThemes() {
-  const themeBtn = document.getElementById("theme-btn");
-  if (themeBtn) {
-    themeBtn.addEventListener("click", cycleTheme);
-  }
+  // handled by ControlPanelView
 }
-
 function setupButtons() {
-  const btnToggle = document.getElementById("btn-toggle-animation");
-  const btnCrash = document.getElementById("btn-market-crash");
-  const btnBull = document.getElementById("btn-bull-run");
-  const btnReset = document.getElementById("btn-reset");
-  const btnExport = document.getElementById("btn-export");
-  const btnModalClose = document.getElementById("modal-close-btn");
-
-  if (btnToggle) btnToggle.addEventListener("click", toggleAnimation);
-  if (btnCrash) btnCrash.addEventListener("click", simulateMarketCrash);
-  if (btnBull) btnBull.addEventListener("click", simulateBullRun);
-  if (btnReset) btnReset.addEventListener("click", resetMarket);
-  if (btnExport) btnExport.addEventListener("click", exportToCSV);
-  if (btnModalClose) btnModalClose.addEventListener("click", closeModal);
+  // handled by ControlPanelView
 }
-
 function setupKeyboardShortcuts() {
-  document.addEventListener("keydown", (e) => {
-    if (e.target.tagName === "INPUT") return;
-    const modal = document.getElementById("modal");
-    if (modal && modal.classList.contains("active")) return;
-
-    switch (e.key.toLowerCase()) {
-      case " ":
-        e.preventDefault();
-        toggleAnimation();
-        break;
-      case "c":
-        simulateMarketCrash();
-        break;
-      case "b":
-        simulateBullRun();
-        break;
-      case "r":
-        resetMarket();
-        break;
-      case "e":
-        exportToCSV();
-        break;
-      case "t":
-        cycleTheme();
-        break;
-      case "escape":
-        closeModal();
-        break;
-    }
-  });
+  // handled by ControlPanelView
 }
-
 // ============================================================================
 // Modal Functions
 // ============================================================================
 
-// Track currently displayed asset in modal for live updates
-let currentModalAssetIndex = null;
-
 function showAssetDetails(index) {
-  currentModalAssetIndex = index;
-  const asset = assets[index];
-  const tileState = app.state.getTile(asset.ticker);
-  const history = app.priceHistory.get(asset.ticker) || [];
-  const mode = app.state.getMode();
-
-  document.getElementById("modal-ticker").textContent = asset.ticker;
-  document.getElementById("modal-name").textContent = asset.name;
-
-  const currentPrice =
-    tileState?.price ?? (mode === "simulation" ? asset.price : null);
-  const currentChange =
-    tileState?.change ?? (mode === "simulation" ? asset.change : null);
-
-  const detailRows = [];
-  const addRow = (label, value, options = {}) => {
-    const safeValue = value ?? "---";
-    const styleAttr = options.color ? ` style="color: ${options.color}"` : "";
-    detailRows.push(`
-      <div class="detail-row">
-        <span class="detail-label">${label}</span>
-        <span class="detail-value"${styleAttr}>${safeValue}</span>
-      </div>
-    `);
-  };
-
-  addRow("Current Price", formatPrice(currentPrice));
-
-  const changeColor =
-    currentChange > 0 ? "#10b981" : currentChange < 0 ? "#ef4444" : null;
-  const changeDisplay =
-    currentChange != null ? formatPercent(currentChange) : "---";
-  addRow(
-    "Change",
-    changeDisplay,
-    changeColor ? { color: changeColor } : undefined,
-  );
-
-  if (mode === "simulation") {
-    const firstPrice = history.length ? history[0] : asset.basePrice;
-    let sessionChange = null;
-    if (currentPrice != null && firstPrice != null && firstPrice !== 0) {
-      sessionChange = ((currentPrice - firstPrice) / firstPrice) * 100;
-    }
-    const sessionColor =
-      sessionChange > 0 ? "#10b981" : sessionChange < 0 ? "#ef4444" : null;
-    addRow(
-      "Session Total",
-      formatPercent(sessionChange),
-      sessionColor ? { color: sessionColor } : undefined,
-    );
-  }
-
-  addRow("Sector", asset.sector);
-
-  const chartHistory = history.length
-    ? [...history]
-    : currentPrice != null
-      ? [currentPrice]
-      : [];
-
-  const openValue =
-    mode === "real"
-      ? tileState?.open
-      : (chartHistory[0] ?? tileState?._placeholderPrice ?? asset.price);
-
-  const previousCloseValue =
-    mode === "real"
-      ? (tileState?.previousClose ?? tileState?.basePrice)
-      : (tileState?.previousClose ??
-        tileState?._placeholderBasePrice ??
-        asset.basePrice);
-
-  const highValue =
-    mode === "real"
-      ? tileState?.high
-      : chartHistory.length
-        ? Math.max(...chartHistory)
-        : openValue;
-
-  const lowValue =
-    mode === "real"
-      ? tileState?.low
-      : chartHistory.length
-        ? Math.min(...chartHistory)
-        : openValue;
-
-  const volumeValue = tileState?.volume;
-  const lastTradeLabel =
-    mode === "real"
-      ? formatRelativeTime(tileState?.lastTradeTs)
-      : "Simulated feed";
-
-  addRow("Open", formatPrice(openValue));
-  addRow("Previous Close", formatPrice(previousCloseValue));
-  addRow("Day High", formatPrice(highValue));
-  addRow("Day Low", formatPrice(lowValue));
-  addRow("Volume", formatVolume(volumeValue));
-  addRow("Last Trade", lastTradeLabel);
-
-  document.getElementById("modal-details").innerHTML = detailRows.join("");
-
-  const chartRange = document.getElementById("chart-time-range");
-  if (chartRange) {
-    chartRange.textContent =
-      mode === "real" ? "Live Stream" : "Simulation Session";
-  }
-
-  const modal = document.getElementById("modal");
-  modal.classList.add("active");
-  document.documentElement.style.overflow = "hidden";
-
-  resetChartOverlays();
-  setTimeout(() => drawModalChart(chartHistory), 150);
+  modalView?.showAssetDetails(index);
 }
 
 function closeModal() {
-  currentModalAssetIndex = null;
-  const modal = document.getElementById("modal");
-  modal.classList.remove("active");
-  document.documentElement.style.overflow = "";
-  resetChartOverlays();
+  modalView?.closeModal();
 }
 
-/**
- * Update modal content if it's currently open
- * Called during live updates to keep modal data fresh
- */
 function updateModalIfOpen() {
-  if (currentModalAssetIndex === null) return;
-
-  const modal = document.getElementById("modal");
-  if (!modal || !modal.classList.contains("active")) {
-    currentModalAssetIndex = null;
-    return;
-  }
-
-  // Refresh modal content without re-opening animation
-  const asset = assets[currentModalAssetIndex];
-  if (!asset) return;
-
-  const tileState = app.state.getTile(asset.ticker);
-  const history = app.priceHistory.get(asset.ticker) || [];
-  const mode = app.state.getMode();
-
-  const currentPrice =
-    tileState?.price ?? (mode === "simulation" ? asset.price : null);
-  const currentChange =
-    tileState?.change ?? (mode === "simulation" ? asset.change : null);
-
-  const detailRows = [];
-  const addRow = (label, value, options = {}) => {
-    const safeValue = value ?? "---";
-    const styleAttr = options.color ? ` style="color: ${options.color}"` : "";
-    detailRows.push(`
-      <div class="detail-row">
-        <span class="detail-label">${label}</span>
-        <span class="detail-value"${styleAttr}>${safeValue}</span>
-      </div>
-    `);
-  };
-
-  addRow("Current Price", formatPrice(currentPrice));
-
-  const changeColor =
-    currentChange > 0 ? "#10b981" : currentChange < 0 ? "#ef4444" : null;
-  const changeDisplay =
-    currentChange != null ? formatPercent(currentChange) : "---";
-  addRow(
-    "Change",
-    changeDisplay,
-    changeColor ? { color: changeColor } : undefined,
-  );
-
-  if (mode === "simulation") {
-    const firstPrice = history.length ? history[0] : asset.basePrice;
-    let sessionChange = null;
-    if (currentPrice != null && firstPrice != null && firstPrice !== 0) {
-      sessionChange = ((currentPrice - firstPrice) / firstPrice) * 100;
-    }
-    const sessionColor =
-      sessionChange > 0 ? "#10b981" : sessionChange < 0 ? "#ef4444" : null;
-    addRow(
-      "Session Total",
-      formatPercent(sessionChange),
-      sessionColor ? { color: sessionColor } : undefined,
-    );
-  }
-
-  addRow("Sector", asset.sector);
-
-  const chartHistory = history.length
-    ? [...history]
-    : currentPrice != null
-      ? [currentPrice]
-      : [];
-
-  const openValue =
-    mode === "real"
-      ? tileState?.open
-      : (chartHistory[0] ?? tileState?._placeholderPrice ?? asset.price);
-
-  const previousCloseValue =
-    mode === "real"
-      ? (tileState?.previousClose ?? tileState?.basePrice)
-      : (tileState?.previousClose ??
-        tileState?._placeholderBasePrice ??
-        asset.basePrice);
-
-  const highValue =
-    mode === "real"
-      ? tileState?.high
-      : chartHistory.length
-        ? Math.max(...chartHistory)
-        : openValue;
-
-  const lowValue =
-    mode === "real"
-      ? tileState?.low
-      : chartHistory.length
-        ? Math.min(...chartHistory)
-        : openValue;
-
-  const volumeValue = tileState?.volume;
-  const lastTradeLabel =
-    mode === "real"
-      ? formatRelativeTime(tileState?.lastTradeTs)
-      : "Simulated feed";
-
-  addRow("Open", formatPrice(openValue));
-  addRow("Previous Close", formatPrice(previousCloseValue));
-  addRow("Day High", formatPrice(highValue));
-  addRow("Day Low", formatPrice(lowValue));
-  addRow("Volume", formatVolume(volumeValue));
-  addRow("Last Trade", lastTradeLabel);
-
-  document.getElementById("modal-details").innerHTML = detailRows.join("");
-
-  // Update chart
-  drawModalChart(chartHistory);
+  modalView?.updateModalIfOpen();
 }
-
-function drawModalChart(history) {
-  const perfId = perfStart("drawModalChart");
-  let pointCount = 0;
-  const finish = (weight) => {
-    perfEnd(perfId, Math.max(weight ?? pointCount, 1));
-  };
-
-  const canvas = document.getElementById("modal-chart");
-  if (!canvas) {
-    finish(1);
-    return;
-  }
-
-  const ctx = canvas.getContext("2d");
-  canvas.width = canvas.offsetWidth;
-  canvas.height = canvas.offsetHeight;
-  const width = canvas.width;
-  const height = canvas.height;
-
-  ctx.clearRect(0, 0, width, height);
-
-  const series = Array.isArray(history) ? history.slice() : [];
-  if (series.length === 1) {
-    series.push(series[0]);
-  }
-
-  const yAxisContainer = document.getElementById("chart-y-axis");
-
-  if (series.length < 2) {
-    if (yAxisContainer) {
-      yAxisContainer.innerHTML = "";
-    }
-    canvas.__chartData = null;
-    resetChartOverlays();
-    finish(1);
-    return;
-  }
-
-  const min = Math.min(...series);
-  const max = Math.max(...series);
-  const range = max - min || 1;
-  const trend = series[series.length - 1] - series[0];
-
-  if (yAxisContainer) {
-    yAxisContainer.innerHTML = `
-      <div>${formatPrice(max)}</div>
-      <div>${formatPrice((max + min) / 2)}</div>
-      <div>${formatPrice(min)}</div>
-    `;
-  }
-
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.06)";
-  ctx.lineWidth = 1;
-  for (let i = 0; i <= 4; i++) {
-    const y = (height / 4) * i;
-    ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(width, y);
-    ctx.stroke();
-  }
-
-  const points = series.map((price, index) => {
-    const x = (index / (series.length - 1)) * width;
-    const y = height - ((price - min) / range) * height * 0.82 - height * 0.09;
-    return { x, y, value: price };
-  });
-  pointCount = points.length;
-
-  const lineColor = trend >= 0 ? "#10b981" : "#ef4444";
-
-  const gradient = ctx.createLinearGradient(0, 0, 0, height);
-  if (trend >= 0) {
-    gradient.addColorStop(0, "rgba(16, 185, 129, 0.2)");
-    gradient.addColorStop(1, "rgba(16, 185, 129, 0.02)");
-  } else {
-    gradient.addColorStop(0, "rgba(239, 68, 68, 0.2)");
-    gradient.addColorStop(1, "rgba(239, 68, 68, 0.02)");
-  }
-
-  ctx.fillStyle = gradient;
-  ctx.beginPath();
-  ctx.moveTo(points[0].x, height);
-  points.forEach((point) => ctx.lineTo(point.x, point.y));
-  ctx.lineTo(points[points.length - 1].x, height);
-  ctx.closePath();
-  ctx.fill();
-
-  ctx.strokeStyle = lineColor;
-  ctx.lineWidth = 3;
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
-  ctx.shadowColor =
-    trend >= 0 ? "rgba(16, 185, 129, 0.35)" : "rgba(239, 68, 68, 0.35)";
-  ctx.shadowBlur = 12;
-  ctx.beginPath();
-  points.forEach((point, index) => {
-    if (index === 0) ctx.moveTo(point.x, point.y);
-    else ctx.lineTo(point.x, point.y);
-  });
-  ctx.stroke();
-  ctx.shadowBlur = 0;
-
-  canvas.__chartData = { points, width, height, color: lineColor };
-  attachModalChartInteractions(canvas);
-  finish();
-}
-
-function resetChartOverlays() {
-  const tooltip = document.getElementById("chart-tooltip");
-  const cursor = document.getElementById("chart-cursor");
-  const pointer = document.getElementById("chart-pointer");
-
-  if (tooltip) {
-    tooltip.classList.remove("visible");
-    tooltip.style.left = "-9999px";
-    tooltip.style.top = "-9999px";
-  }
-
-  if (cursor) {
-    cursor.classList.remove("visible");
-  }
-
-  if (pointer) {
-    pointer.classList.remove("visible");
-    pointer.style.left = "-9999px";
-    pointer.style.top = "-9999px";
-  }
-}
-
-function attachModalChartInteractions(canvas) {
-  if (canvas.__chartInteractionsAttached) return;
-
-  const tooltip = document.getElementById("chart-tooltip");
-  const cursor = document.getElementById("chart-cursor");
-  const pointer = document.getElementById("chart-pointer");
-  if (!tooltip || !cursor || !pointer) return;
-
-  const wrapper = canvas.parentElement;
-
-  const handleMove = (event) => {
-    const data = canvas.__chartData;
-    if (!data || !data.points || data.points.length === 0) {
-      resetChartOverlays();
-      return;
-    }
-
-    const rect = canvas.getBoundingClientRect();
-    const relativeX = event.clientX - rect.left;
-    const clampedX = Math.max(0, Math.min(rect.width, relativeX));
-    const index = Math.round(
-      (clampedX / rect.width) * (data.points.length - 1),
-    );
-    const point = data.points[index];
-
-    if (!point) {
-      resetChartOverlays();
-      return;
-    }
-
-    const offsetLeft = canvas.offsetLeft;
-    const offsetTop = canvas.offsetTop;
-    const wrapperWidth = wrapper.offsetWidth;
-    const pointerSize = pointer.offsetWidth || 12;
-    const accentColor = data.color || "#3b82f6";
-
-    cursor.style.left = `${offsetLeft + point.x}px`;
-    cursor.classList.add("visible");
-
-    pointer.style.left = `${offsetLeft + point.x - pointerSize / 2}px`;
-    pointer.style.top = `${offsetTop + point.y - pointerSize / 2}px`;
-    pointer.style.background = accentColor;
-    pointer.style.boxShadow = `0 0 12px ${accentColor}55`;
-    pointer.classList.add("visible");
-
-    tooltip.textContent = formatPrice(point.value);
-    tooltip.style.borderColor = `${accentColor}66`;
-    let tooltipLeft = offsetLeft + point.x + 12;
-    const tooltipWidth = tooltip.offsetWidth || 96;
-    if (tooltipLeft + tooltipWidth > wrapperWidth) {
-      tooltipLeft = offsetLeft + point.x - tooltipWidth - 12;
-    }
-    tooltip.style.left = `${tooltipLeft}px`;
-    tooltip.style.top = `${Math.max(8, offsetTop + point.y - 32)}px`;
-    tooltip.classList.add("visible");
-  };
-
-  const handleLeave = () => {
-    resetChartOverlays();
-  };
-
-  canvas.addEventListener("mousemove", handleMove);
-  canvas.addEventListener("mouseleave", handleLeave);
-  canvas.__chartInteractionsAttached = true;
-}
-
 // ============================================================================
 // Control Functions
 // ============================================================================

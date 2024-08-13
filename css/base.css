@@ -67,9 +67,9 @@ body::before {
 .title {
   font-size: 2.5rem;
   font-weight: 300;
-  letter-spacing: -0.5px;
+  letter-spacing: var(--letter-spacing-tight);
   margin-bottom: 10px;
-  background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 50%, var(--accent-tertiary) 100%);
+  background: var(--text-gradient-primary);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -79,7 +79,7 @@ body::before {
 .subtitle {
   color: var(--text-secondary);
   font-size: 0.9rem;
-  letter-spacing: 2px;
+  letter-spacing: var(--letter-spacing-ultra-wide);
   text-transform: uppercase;
   opacity: 0.9;
 }
@@ -87,7 +87,7 @@ body::before {
 @media (max-width: 768px) {
   .title {
     font-size: 1.8rem;
-    letter-spacing: -0.3px;
+    letter-spacing: var(--letter-spacing-narrow);
   }
 
   .subtitle {
