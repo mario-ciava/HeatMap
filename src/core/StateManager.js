@@ -61,6 +61,39 @@ export class StateManager extends EventEmitter {
   }
 
   /**
+   * Reinitialize tiles with a new set of assets
+   * @param {Array} assets - New assets array
+   */
+  reinitializeTiles(assets) {
+    // Clear existing tiles
+    this.state.tiles.clear();
+
+    // Initialize new tiles from assets array
+    assets.forEach(asset => {
+      this.state.tiles.set(asset.ticker, {
+        ticker: asset.ticker,
+        name: asset.name,
+        sector: asset.sector,
+        _placeholderPrice: asset.price,
+        _placeholderBasePrice: asset.basePrice,
+        price: null,
+        basePrice: null,
+        change: null,
+        previousClose: null,
+        open: null,
+        high: null,
+        low: null,
+        volume: null,
+        hasInfo: false,
+        lastTradeTs: 0,
+        dirty: true
+      });
+    });
+
+    this.emit('tiles:reinitialized', { count: assets.length });
+  }
+
+  /**
    * Get current mode
    * @returns {'simulation' | 'real'}
    */

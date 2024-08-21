@@ -442,13 +442,22 @@
   width: 6px;
 }
 
+.select-dropdown::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 10px;
+}
+
 .select-dropdown::-webkit-scrollbar-thumb {
   background: var(--accent-glow-medium);
   border-radius: 10px;
+  border: 1px solid transparent;
+  background-clip: padding-box;
+  transition: background 0.3s ease;
 }
 
 .select-dropdown::-webkit-scrollbar-thumb:hover {
   background: var(--accent-glow-strong);
+  background-clip: padding-box;
 }
 
 .select-option {

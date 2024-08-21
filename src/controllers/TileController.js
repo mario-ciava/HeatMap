@@ -118,4 +118,55 @@ export class TileController {
 
     this.scheduler.request(ticker, cacheIndex);
   }
+
+  /**
+   * Handle batch tile updates (optimization for simulation mode)
+   * @param {Object} payload - { tickers: Array<{ticker, index}>, count: number }
+   */
+  handleTilesBatchUpdated({ tickers }) {
+    if (!tickers || !Array.isArray(tickers)) return;
+
+    const perfId = perfStart("handleTilesBatch");
+
+    // Process all updates in batch
+    tickers.forEach(({ ticker, index }) => {
+      if (!ticker) return;
+
+      const tile = this.state.getTile(ticker);
+      if (tile) {
+        tile.dirty = true;
+      }
+
+      let historyLength = 0;
+      if (tile && tile.price != null) {
+        historyLength = this.registry.appendPrice(
+          ticker,
+          tile.price,
+          this.historyLength,
+        );
+      }
+
+      const cacheIndex =
+        typeof index === "number" ? index : this.registry.getAssetIndex(ticker);
+      const cached =
+        cacheIndex >= 0 ? this.registry.getCacheByIndex(cacheIndex) : undefined;
+
+      if (cached) {
+        if (
+          cached.needsSparklineUpdate == null ||
+          historyLength === 0 ||
+          cached.lastHistoryLength !== historyLength
+        ) {
+          cached.needsSparklineUpdate = true;
+        }
+        if (historyLength > 0) {
+          cached.lastHistoryLength = historyLength;
+        }
+      }
+
+      this.scheduler.request(ticker, cacheIndex);
+    });
+
+    perfEnd(perfId, tickers.length);
+  }
 }

@@ -12,6 +12,17 @@ export class ModalView {
     this.app = app;
   }
 
+  /**
+   * Update assets list
+   */
+  updateAssets(newAssets) {
+    this.assets = newAssets;
+    // Close modal if currently open asset is out of range
+    if (this.currentModalAssetIndex !== null && this.currentModalAssetIndex >= newAssets.length) {
+      this.closeModal();
+    }
+  }
+
   init() {
     const modal = document.getElementById("modal");
     if (modal) {

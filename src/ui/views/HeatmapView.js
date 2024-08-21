@@ -4,13 +4,25 @@ export class HeatmapView {
     this.assets = assets;
     this.modalView = modalView;
     this.helpers = helpers;
+    this.container = null;
   }
 
   setApp(app) {
     this.app = app;
   }
 
+  /**
+   * Update assets and rebuild the heatmap
+   */
+  updateAssets(newAssets) {
+    this.assets = newAssets;
+    if (this.container) {
+      this.buildHeatmap(this.container);
+    }
+  }
+
   buildHeatmap(container) {
+    this.container = container;
     container.innerHTML = "";
 
     this.assets.forEach((asset, index) => {

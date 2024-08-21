@@ -60,7 +60,7 @@
   font-size: 2.5rem;
   font-weight: 200;
   line-height: 1;
-  transition: all 0.3s var(--ease-standard);
+  transition: all 0.4s var(--ease-smooth);
 }
 
 .add-tile:hover .add-tile-icon {
@@ -83,7 +83,7 @@
   letter-spacing: var(--letter-spacing-extra-wide);
   text-transform: uppercase;
   color: var(--accent-secondary);
-  transition: color 0.3s ease;
+  transition: all 0.4s var(--ease-smooth);
 }
 
 .add-tile:hover .add-tile-title {
@@ -96,7 +96,7 @@
   letter-spacing: var(--letter-spacing-wide);
   text-transform: uppercase;
   color: rgba(148, 163, 184, 0.7);
-  transition: color 0.3s ease;
+  transition: all 0.4s var(--ease-smooth);
 }
 
 .add-tile:hover .add-tile-subtitle {
@@ -117,6 +117,7 @@
     0 0 0 1px var(--accent-glow-soft) inset;
   position: relative;
   animation: fadeIn 1s ease-out 0.4s both;
+  transition: all 0.4s var(--ease-smooth);
 }
 
 /* Asset tiles */
@@ -178,8 +179,8 @@
 .sparkline-canvas {
   position: absolute;
   bottom: 32px;
-  left: 10px;
-  right: 10px;
+  left: 0;
+  right: 0;
   height: 28px;
   pointer-events: none;
   opacity: 0.6;
@@ -439,10 +440,133 @@ body[data-theme="monochrome"] .asset-tile.gaining-strong .price {
   }
 }
 
+/* Single tile mode - Enhanced display when only one tile is visible */
+.heatmap-grid.single-tile-mode {
+  grid-template-columns: repeat(2, 1fr);
+  max-width: 1200px;
+  margin: 0 auto;
+  gap: 16px;
+}
+
+.heatmap-grid.single-tile-mode .asset-tile:not(.hidden) {
+  min-height: 400px;
+  padding: 32px;
+}
+
+.heatmap-grid.single-tile-mode .add-tile {
+  min-height: 400px;
+  padding: 40px;
+}
+
+.heatmap-grid.single-tile-mode .add-tile-icon {
+  width: 100px;
+  height: 100px;
+  font-size: 5rem;
+}
+
+.heatmap-grid.single-tile-mode .add-tile-title {
+  font-size: 1.8rem;
+  letter-spacing: var(--letter-spacing-expanded);
+}
+
+.heatmap-grid.single-tile-mode .add-tile-subtitle {
+  font-size: 1.2rem;
+}
+
+.heatmap-grid.single-tile-mode .asset-tile:not(.hidden) .ticker {
+  font-size: 2.5rem;
+  margin-bottom: 16px;
+  letter-spacing: var(--letter-spacing-expanded);
+}
+
+.heatmap-grid.single-tile-mode .asset-tile:not(.hidden) .price {
+  font-size: 3.2rem;
+  margin-bottom: 12px;
+}
+
+.heatmap-grid.single-tile-mode .asset-tile:not(.hidden) .change {
+  font-size: 1.8rem;
+  padding: 12px 20px;
+  border-radius: 8px;
+}
+
+.heatmap-grid.single-tile-mode .asset-tile:not(.hidden) .change::before {
+  font-size: 1.4rem;
+}
+
+.heatmap-grid.single-tile-mode .asset-tile:not(.hidden) .sparkline-canvas {
+  height: 120px;
+  width: 100%;
+  bottom: 80px;
+}
+
+/* Override container queries for single-tile-mode */
+@supports (container-type: inline-size) {
+  @container asset-card (min-width: 180px) {
+    .heatmap-grid.single-tile-mode .asset-tile:not(.hidden) .sparkline-canvas {
+      height: 120px;
+    }
+  }
+
+  @container asset-card (min-width: 220px) {
+    .heatmap-grid.single-tile-mode .asset-tile:not(.hidden) .sparkline-canvas {
+      height: 120px;
+    }
+  }
+}
+
 @media (max-width: 768px) {
   .heatmap-grid {
     grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
     gap: 3px;
     padding: 16px;
+  }
+
+  .heatmap-grid.single-tile-mode {
+    max-width: 100%;
+    padding: 16px;
+    gap: 12px;
+    grid-template-columns: 1fr;
+  }
+
+  .heatmap-grid.single-tile-mode .asset-tile:not(.hidden) {
+    min-height: 320px;
+    padding: 24px;
+  }
+
+  .heatmap-grid.single-tile-mode .add-tile {
+    min-height: 320px;
+    padding: 32px;
+  }
+
+  .heatmap-grid.single-tile-mode .add-tile-icon {
+    width: 80px;
+    height: 80px;
+    font-size: 4rem;
+  }
+
+  .heatmap-grid.single-tile-mode .add-tile-title {
+    font-size: 1.4rem;
+  }
+
+  .heatmap-grid.single-tile-mode .add-tile-subtitle {
+    font-size: 1rem;
+  }
+
+  .heatmap-grid.single-tile-mode .asset-tile:not(.hidden) .ticker {
+    font-size: 2rem;
+  }
+
+  .heatmap-grid.single-tile-mode .asset-tile:not(.hidden) .price {
+    font-size: 2.5rem;
+  }
+
+  .heatmap-grid.single-tile-mode .asset-tile:not(.hidden) .change {
+    font-size: 1.4rem;
+  }
+
+  .heatmap-grid.single-tile-mode .asset-tile:not(.hidden) .sparkline-canvas {
+    height: 80px;
+    width: 100%;
   }
 }

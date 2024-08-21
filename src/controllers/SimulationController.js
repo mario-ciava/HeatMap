@@ -59,8 +59,28 @@ export class SimulationController {
       (CONFIG.UI.VOLATILITY.BASE + volatilityOscillation) * CONFIG.UI.VOLATILITY.USER_MULTIPLIER;
 
     let processed = 0;
+    const updatedTickers = [];
+
+    // Get visible tiles from DOM (optimization: only update visible tiles)
+    const visibleTileElements = typeof document !== 'undefined'
+      ? document.querySelectorAll('.asset-tile:not(.hidden):not(.add-tile)')
+      : [];
+
+    // Build a Set of visible indices for O(1) lookup
+    const visibleIndices = new Set();
+    visibleTileElements.forEach(tileEl => {
+      const index = parseInt(tileEl.dataset.index);
+      if (!Number.isNaN(index)) {
+        visibleIndices.add(index);
+      }
+    });
 
     this.assets.forEach((asset, index) => {
+      // Skip hidden tiles - don't update them at all
+      if (visibleIndices.size > 0 && !visibleIndices.has(index)) {
+        return;
+      }
+
       const tile = this.state.getTile(asset.ticker);
       if (!tile) return;
 
@@ -95,9 +115,14 @@ export class SimulationController {
       tile.hasInfo = true;
       tile.dirty = true;
 
-      this.state.emit("tile:updated", { ticker: asset.ticker, index });
+      updatedTickers.push({ ticker: asset.ticker, index });
       processed++;
     });
+
+    // Emit batch event ONLY for visible/updated tiles
+    if (updatedTickers.length > 0) {
+      this.state.emit("tiles:batch_updated", { tickers: updatedTickers, count: processed });
+    }
 
     perfEnd(perfId, processed);
   }

@@ -24,9 +24,8 @@
   width: 92%;
   max-height: 85vh;
   padding: 40px;
-  overflow-y: auto;
+  overflow-y: scroll;
   overflow-x: hidden;
-  scrollbar-gutter: stable;
   /* background: linear-gradient(
     135deg,
     rgba(31, 41, 55, 0.96) 0%,
@@ -60,28 +59,40 @@
   backdrop-filter: blur(12px);
 }
 
+/* Nasconde scrollbar ma mantiene funzionalità scroll */
+.modal-content,
+.add-ticker-modal {
+  scrollbar-width: thin;
+  scrollbar-color: var(--accent-glow-medium) transparent;
+}
+
 .modal-content::-webkit-scrollbar,
 .add-ticker-modal::-webkit-scrollbar {
-  width: 6px;
+  width: 12px;
+  background: transparent;
 }
 
 .modal-content::-webkit-scrollbar-track,
 .add-ticker-modal::-webkit-scrollbar-track {
-  background: var(--surface-input-bg);
-  border-radius: 10px;
-  margin: 6px;
+  background: transparent;
+  border: none;
+  margin: 22px 0;
 }
 
 .modal-content::-webkit-scrollbar-thumb,
 .add-ticker-modal::-webkit-scrollbar-thumb {
   background: var(--accent-glow-medium);
   border-radius: 10px;
+  border: 2px solid rgba(0, 0, 0, 0);
+  background-clip: padding-box;
   transition: background 0.3s ease;
+  min-height: 40px;
 }
 
 .modal-content::-webkit-scrollbar-thumb:hover,
 .add-ticker-modal::-webkit-scrollbar-thumb:hover {
   background: var(--accent-glow-strong);
+  background-clip: padding-box;
 }
 
 .modal-close {

@@ -5,7 +5,7 @@
 
 import { FinnhubTransport } from "../transport/FinnhubTransport.js";
 import { StateManager } from "../core/StateManager.js";
-import { CONFIG } from "../config.js";
+import { CONFIG, SIMULATION_ASSETS, REAL_DATA_ASSETS } from "../config.js";
 import { logger } from "../utils/Logger.js";
 import { perfStart, perfEnd } from "../utils/perfHelpers.js";
 import { TileRegistry } from "../registry/TileRegistry.js";
@@ -17,6 +17,8 @@ const log = logger.child("App");
 export class AppController {
   constructor(assets) {
     this.assets = assets;
+    this.heatmapView = null;
+    this.modalView = null;
     this.tileRegistry = new TileRegistry(this.assets);
 
     // Initialize state manager with assets
@@ -54,6 +56,55 @@ export class AppController {
     });
 
     log.info("AppController initialized");
+  }
+
+  /**
+   * Set references to view components
+   * @param {Object} views - Object containing heatmapView and modalView
+   */
+  setViews(views) {
+    if (views.heatmapView) this.heatmapView = views.heatmapView;
+    if (views.modalView) this.modalView = views.modalView;
+  }
+
+  /**
+   * Switch to a new set of assets
+   * @param {Array} newAssets - New assets array
+   * @param {string} mode - Mode for which these assets are being set
+   */
+  switchAssets(newAssets, mode) {
+    log.info(`Switching to ${newAssets.length} assets for ${mode} mode`);
+
+    // Update assets reference
+    this.assets = newAssets;
+
+    // Reinitialize state tiles
+    this.state.reinitializeTiles(newAssets);
+
+    // Update tile registry
+    this.tileRegistry.setAssets(newAssets);
+
+    // Update views
+    if (this.modalView) {
+      this.modalView.updateAssets(newAssets);
+    }
+
+    if (this.heatmapView) {
+      this.heatmapView.updateAssets(newAssets);
+
+      // Reinitialize DOM cache immediately after heatmap rebuild
+      // Use setTimeout to ensure DOM is updated
+      setTimeout(() => {
+        this.tileRegistry.initializeDOMCache();
+        this.tileController.resetPriceHistory(mode);
+
+        // Re-render all tiles with new cache
+        this.paintAll();
+      }, 50); // Small delay to ensure DOM is ready
+    }
+
+    // Update simulation controller with new assets
+    this.simulation.assets = newAssets;
   }
 
   /**
@@ -99,6 +150,15 @@ export class AppController {
 
     log.info(`Switching to ${mode} mode...`);
 
+    // Track if we're switching assets (and thus rebuilding everything)
+    const isSwitchingAssets = oldMode !== mode;
+
+    // Switch to appropriate asset list for the mode
+    if (isSwitchingAssets) {
+      const newAssets = mode === 'simulation' ? SIMULATION_ASSETS : REAL_DATA_ASSETS;
+      this.switchAssets(newAssets, mode);
+    }
+
     // Update state
     this.state.setMode(mode);
 
@@ -106,9 +166,11 @@ export class AppController {
       // Stop simulation loop
       this.simulation.stop();
 
-      // Reset tiles but preserve any previously fetched real data
-      this.state.resetAllTiles(true);
-      this.tileController.resetPriceHistory("real");
+      // Reset tiles only if we didn't just rebuild everything
+      if (!isSwitchingAssets) {
+        this.state.resetAllTiles(true);
+        this.tileController.resetPriceHistory("real");
+      }
 
       // Initialize fetching progress counter
       this.fetchingTotal = this.assets.length;
@@ -131,9 +193,12 @@ export class AppController {
       // Stop transport
       this.simulation.stopTransport();
 
-      // Reset tiles to simulation mode (saves real data for later)
-      this.state.resetAllTiles(false);
-      this.tileController.resetPriceHistory("simulation");
+      // Reset tiles only if we didn't just rebuild everything
+      if (!isSwitchingAssets) {
+        this.state.resetAllTiles(false);
+        this.tileController.resetPriceHistory("simulation");
+      }
+
       this.fetchingTotal = 0;
       this.fetchingCompleted = 0;
       this.fetchingJustCompleted = false;
@@ -176,7 +241,7 @@ export class AppController {
    * @private
    */
   _setupEventHandlers() {
-    // State events
+    // State events - Single tile update (Real Data mode)
     this.state.on("tile:updated", (payload = {}) => {
       const { ticker } = payload;
       if (!ticker) return;
@@ -189,6 +254,17 @@ export class AppController {
         if (mode === "real") {
           this._updateFetchingProgress();
         }
+      } finally {
+        perfEnd(perfId);
+      }
+    });
+
+    // State events - Batch tile updates (Simulation mode optimization)
+    this.state.on("tiles:batch_updated", (payload = {}) => {
+      const perfId = perfStart("state:batchUpdated");
+
+      try {
+        this.tileController.handleTilesBatchUpdated(payload);
       } finally {
         perfEnd(perfId);
       }
