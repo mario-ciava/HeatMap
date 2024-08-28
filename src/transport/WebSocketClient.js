@@ -4,7 +4,7 @@
  */
 
 import { EventEmitter } from '../core/EventEmitter.js';
-import { CONFIG } from '../config.js';
+import { CONFIG, getApiEndpoints, shouldUseProxy } from '../config.js';
 import { logger } from '../utils/Logger.js';
 
 const log = logger.child('WS');
@@ -68,7 +68,8 @@ export class WebSocketClient extends EventEmitter {
       return;
     }
 
-    if (!this.apiKey) {
+    const useProxy = shouldUseProxy();
+    if (!this.apiKey && !useProxy) {
       log.error('Cannot connect: API key not set');
       this.emit('error', { code: 'NO_API_KEY', message: 'API key required' });
       return;
@@ -77,7 +78,11 @@ export class WebSocketClient extends EventEmitter {
     this._setState(States.CONNECTING);
     log.info('Connecting to Finnhub WebSocket...');
 
-    const url = `${CONFIG.FINNHUB.WS_URL}?token=${this.apiKey}`;
+    // Get correct WebSocket URL based on PROXY_MODE
+    const endpoints = getApiEndpoints();
+    const url = endpoints.useProxy
+      ? endpoints.wsUrl  // Proxy handles authentication
+      : `${endpoints.wsUrl}?token=${this.apiKey}`;  // Direct connection
 
     try {
       this.ws = new WebSocket(url);
@@ -128,10 +133,18 @@ export class WebSocketClient extends EventEmitter {
     try {
       const data = JSON.parse(event.data);
 
-      // Handle ping/pong for connection health
+      // Handle ping from server - respond with pong
       if (data.type === 'ping') {
-        this._send({ type: 'pong' });
+        this._send({ type: 'pong', timestamp: Date.now() });
         this.lastPongTime = Date.now();
+        log.debug('Responded to ping with pong');
+        return;
+      }
+
+      // Handle pong from server (if we sent ping)
+      if (data.type === 'pong') {
+        this.lastPongTime = Date.now();
+        log.debug('Received pong from server');
         return;
       }
 
@@ -336,17 +349,28 @@ export class WebSocketClient extends EventEmitter {
     if (this.reconnectTimer) return;
     if (this.state === States.STOPPED) return;
 
+    // Check if max retries exceeded
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      log.error(`Max reconnection attempts (${this.maxReconnectAttempts}) exceeded`);
+      this._setState(States.STOPPED);
+      this.emit('error', {
+        code: 'MAX_RETRIES_EXCEEDED',
+        message: `Failed to connect after ${this.maxReconnectAttempts} attempts`
+      });
+      return;
+    }
+
     this._setState(States.RECONNECTING);
 
     const delay = Math.min(
-      CONFIG.FINNHUB.RECONNECT.INITIAL_DELAY * 
+      CONFIG.FINNHUB.RECONNECT.INITIAL_DELAY *
         Math.pow(CONFIG.FINNHUB.RECONNECT.BACKOFF_MULTIPLIER, this.reconnectAttempts),
       CONFIG.FINNHUB.RECONNECT.MAX_DELAY
     );
 
     this.reconnectAttempts++;
 
-    log.info(`Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`);
+    log.info(`Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
 
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;

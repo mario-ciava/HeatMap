@@ -5,7 +5,7 @@
 
 import { FinnhubTransport } from "../transport/FinnhubTransport.js";
 import { StateManager } from "../core/StateManager.js";
-import { CONFIG, SIMULATION_ASSETS, REAL_DATA_ASSETS } from "../config.js";
+import { CONFIG, SIMULATION_ASSETS, REAL_DATA_ASSETS, shouldUseProxy, isLocalDevelopment } from "../config.js";
 import { logger } from "../utils/Logger.js";
 import { perfStart, perfEnd } from "../utils/perfHelpers.js";
 import { TileRegistry } from "../registry/TileRegistry.js";
@@ -640,6 +640,21 @@ export class AppController {
    * @private
    */
   _loadApiKey() {
+    const useProxy = shouldUseProxy();
+    const isLocal = isLocalDevelopment();
+
+    // PROXY MODE: API key managed server-side (secure)
+    if (useProxy) {
+      log.info(`🔒 PROXY MODE: API key managed server-side (${isLocal ? 'testing locally' : 'production'})`);
+      try {
+        this._updateApiKeyDisplay('');
+      } catch {}
+      return '';  // Empty key since proxy handles authentication
+    }
+
+    // LOCAL DEVELOPMENT MODE: use API key directly
+    log.info("🔧 LOCAL MODE: Using direct API connection");
+
     try {
       // Try to load from localStorage first
       const savedKey = localStorage.getItem(CONFIG.API_KEY.STORAGE_KEY);
@@ -649,19 +664,17 @@ export class AppController {
         return savedKey;
       }
 
-      // Fallback to default key from config
-      if (CONFIG.API_KEY.DEFAULT) {
-        log.info("Using default API key from config.js");
-        return CONFIG.API_KEY.DEFAULT;
+      // Fallback to local dev key
+      if (CONFIG.API_KEY.LOCAL_DEV_KEY) {
+        log.info("Using LOCAL_DEV_KEY for development");
+        return CONFIG.API_KEY.LOCAL_DEV_KEY;
       }
 
-      log.warn("No API key available (neither in storage nor in config)");
+      log.warn("No API key available");
       return "";
     } catch (e) {
-      log.warn(
-        "Failed to load API key from localStorage, using config fallback",
-      );
-      return CONFIG.API_KEY.DEFAULT || "";
+      log.warn("Failed to load API key, using local dev key");
+      return CONFIG.API_KEY.LOCAL_DEV_KEY || "";
     }
   }
 
@@ -686,8 +699,21 @@ export class AppController {
     const display = document.getElementById("api-key-display");
     if (!display) return;
 
+    const useProxy = shouldUseProxy();
+
+    // In proxy mode, show message instead of key
+    if (useProxy) {
+      display.value = "🔒 Managed by proxy";
+      display.dataset.actual = "";
+      display.dataset.visibility = "masked";
+      display.disabled = true;
+      this._syncApiKeyControls("");
+      return;
+    }
+
     const actualKey = key || "";
     display.dataset.actual = actualKey;
+    display.disabled = false;
     if (!display.dataset.visibility) {
       display.dataset.visibility = "masked";
     }

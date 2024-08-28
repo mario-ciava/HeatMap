@@ -8,7 +8,7 @@ import { EventEmitter } from '../core/EventEmitter.js';
 import { WebSocketClient } from './WebSocketClient.js';
 import { RESTClient } from './RESTClient.js';
 import { MarketStatusService } from '../services/MarketStatusService.js';
-import { CONFIG, getExchangeForTicker } from '../config.js';
+import { CONFIG, getExchangeForTicker, shouldUseProxy } from '../config.js';
 import { logger } from '../utils/Logger.js';
 
 const log = logger.child('Transport');
@@ -25,8 +25,9 @@ const Strategy = {
 export class FinnhubTransport extends EventEmitter {
   constructor(apiKey, stateManager) {
     super();
-    
-    if (!apiKey) {
+
+    const useProxy = shouldUseProxy();
+    if (!apiKey && !useProxy) {
       log.warn('No API key provided at initialization');
     }
 
@@ -93,7 +94,8 @@ export class FinnhubTransport extends EventEmitter {
       return;
     }
 
-    if (!this.apiKey) {
+    const useProxy = shouldUseProxy();
+    if (!this.apiKey && !useProxy) {
       log.error('Cannot start: no API key set');
       this.emit('error', { code: 'NO_API_KEY', message: 'API key required' });
       return;
@@ -342,7 +344,7 @@ export class FinnhubTransport extends EventEmitter {
 
   /**
    * Start sequential REST fetch for initial data population
-   * Prioritizes tickers without existing data
+   * Uses batch processing for better performance
    * @private
    */
   _startSequentialFetch(tickers) {
@@ -370,57 +372,64 @@ export class FinnhubTransport extends EventEmitter {
     this.sequentialFetchQueue = [...sortedTickers];
     this.sequentialFetchInProgress = true;
 
-    log.info(`Starting sequential fetch for ${sortedTickers.length} tickers (prioritized)`);
+    log.info(`Starting batch fetch for ${sortedTickers.length} tickers (${Math.ceil(sortedTickers.length / 5)} batches)`);
 
-    // Start processing queue
-    this._processSequentialFetchQueue();
+    // Start processing queue with batch optimization
+    this._processBatchFetchQueue();
   }
 
   /**
-   * Process sequential fetch queue
+   * Process fetch queue in batches for better performance
+   * Fetches 5 tickers in parallel, then waits 1.1s before next batch
    * @private
    */
-  async _processSequentialFetchQueue() {
-    // Stop if no longer running or queue is empty
-    if (!this.isRunning || this.sequentialFetchQueue.length === 0) {
-      this.sequentialFetchInProgress = false;
-      if (this.sequentialFetchQueue.length === 0) {
-        log.info('Sequential fetch completed');
+  async _processBatchFetchQueue() {
+    const BATCH_SIZE = 5;
+    const BATCH_DELAY_MS = 1100; // 1.1s between batches
+
+    while (this.isRunning && this.sequentialFetchQueue.length > 0) {
+      // Get next batch of tickers
+      const batch = [];
+      for (let i = 0; i < BATCH_SIZE && this.sequentialFetchQueue.length > 0; i++) {
+        const ticker = this.sequentialFetchQueue.shift();
+
+        // Skip if already has data
+        const tile = this.stateManager.getTile(ticker);
+        if (tile && tile.hasInfo) {
+          log.debug(`Skipping ${ticker} - already has data`);
+          continue;
+        }
+
+        batch.push(ticker);
       }
-      return;
-    }
 
-    const ticker = this.sequentialFetchQueue.shift();
+      if (batch.length === 0) continue;
 
-    // Skip if we already have data for this ticker (might have come from WebSocket)
-    const tile = this.stateManager.getTile(ticker);
-    if (tile && tile.hasInfo) {
-      log.debug(`Skipping ${ticker} - already has data`);
-      // Continue with next ticker immediately
-      this._processSequentialFetchQueue();
-      return;
-    }
+      log.debug(`Fetching batch of ${batch.length} tickers...`);
 
-    log.debug(`Fetching quote for ${ticker}...`);
+      // Fetch batch in parallel
+      const results = await Promise.allSettled(
+        batch.map(ticker => this.rest.fetchQuote(ticker))
+      );
 
-    try {
-      const quote = await this.rest.fetchQuote(ticker);
+      // Process results
+      results.forEach((result, index) => {
+        const ticker = batch[index];
+        if (result.status === 'fulfilled' && result.value) {
+          this._handleQuote(result.value, 'rest-batch');
+        } else {
+          log.warn(`Failed to fetch ${ticker}:`, result.reason?.message || 'Unknown error');
+        }
+      });
 
-      if (quote) {
-        this._handleQuote(quote, 'rest-sequential');
-      } else {
-        log.warn(`No quote data received for ${ticker}`);
+      // Wait before next batch (only if more items to process)
+      if (this.sequentialFetchQueue.length > 0) {
+        await new Promise(resolve => setTimeout(resolve, BATCH_DELAY_MS));
       }
-    } catch (error) {
-      log.error(`Failed to fetch ${ticker}:`, error.message);
     }
 
-    // Delay before next request to respect rate limits
-    // 60 requests/min = 1 request per second
-    const delayMs = 1100; // 1.1 seconds to be safe
-    setTimeout(() => {
-      this._processSequentialFetchQueue();
-    }, delayMs);
+    this.sequentialFetchInProgress = false;
+    log.info('Batch fetch completed');
   }
 
   /**

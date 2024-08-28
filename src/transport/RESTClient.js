@@ -4,7 +4,7 @@
  */
 
 import { EventEmitter } from '../core/EventEmitter.js';
-import { CONFIG } from '../config.js';
+import { CONFIG, getApiEndpoints } from '../config.js';
 import { logger } from '../utils/Logger.js';
 
 const log = logger.child('REST');
@@ -12,9 +12,13 @@ const log = logger.child('REST');
 export class RESTClient extends EventEmitter {
   constructor(apiKey) {
     super();
-    
+
     this.apiKey = apiKey;
-    this.baseUrl = CONFIG.FINNHUB.REST_BASE;
+
+    // Determine endpoints based on PROXY_MODE
+    const endpoints = getApiEndpoints();
+    this.baseUrl = endpoints.restBase;
+    this.useProxy = endpoints.useProxy;
     
     // Rate limiting state
     this.requestCount = 0;
@@ -228,7 +232,10 @@ export class RESTClient extends EventEmitter {
       throw new Error(`In backoff cooldown (${Math.ceil(waitMs / 1000)}s remaining)`);
     }
 
-    const url = `${this.baseUrl}${endpoint}${endpoint.includes('?') ? '&' : '?'}token=${this.apiKey}`;
+    // Build URL: in proxy mode, DON'T append token (handled server-side by Worker)
+    const url = this.useProxy
+      ? `${this.baseUrl}${endpoint}`
+      : `${this.baseUrl}${endpoint}${endpoint.includes('?') ? '&' : '?'}token=${this.apiKey}`;
 
     try {
       const response = await fetch(url, {

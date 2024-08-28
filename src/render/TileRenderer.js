@@ -99,6 +99,16 @@ export class TileRenderer {
             cached.change.textContent = changeText;
             cached.lastChangeText = changeText;
           }
+          // Apply positive/negative classes for arrow display
+          if (changeValue > 0) {
+            cached.change.classList.remove("negative");
+            cached.change.classList.add("positive");
+          } else if (changeValue < 0) {
+            cached.change.classList.remove("positive");
+            cached.change.classList.add("negative");
+          } else {
+            cached.change.classList.remove("positive", "negative");
+          }
           cached.lastChangeValue = changeValue;
         } else {
           const placeholder = mode === "real" ? "---" : "0.00%";
@@ -106,6 +116,7 @@ export class TileRenderer {
             cached.change.textContent = placeholder;
             cached.lastChangeText = placeholder;
           }
+          cached.change.classList.remove("positive", "negative");
           cached.lastChangeValue = null;
         }
       } else {
@@ -115,7 +126,7 @@ export class TileRenderer {
       const derivedState = this._deriveTileState(tile.change);
       if (derivedState !== cached.lastTileState) {
         this._updateTileClasses(cached.element, derivedState);
-        cached.lastTileState = cached.element.dataset.state || derivedState;
+        cached.lastTileState = derivedState;
       }
 
       this._updateDotState(cached, ticker);
@@ -140,7 +151,9 @@ export class TileRenderer {
   _updateTileClasses(element, nextState) {
     const perfId = perfStart("updateTileClasses");
     const current = element.dataset.state || "neutral";
-    if (current === nextState && element.classList.contains(nextState)) {
+
+    // CRITICAL: Don't touch classes if state hasn't changed - preserves CSS animations!
+    if (current === nextState) {
       perfEnd(perfId);
       return;
     }
@@ -156,9 +169,7 @@ export class TileRenderer {
     element.classList.add(nextState);
     element.dataset.state = nextState;
 
-    if (current !== nextState) {
-      this._animateTileStateChange(element);
-    }
+    this._animateTileStateChange(element);
     perfEnd(perfId);
   }
 

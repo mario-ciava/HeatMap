@@ -1,3 +1,7 @@
+/* Layer Cascade: Define order (lowest → highest priority) */
+@layer tokens, base, utilities, components, overrides, legacy;
+
+@layer tokens {
 :root {
   --bg-primary: #141a24;
   --bg-secondary: #1f2937;
@@ -163,6 +167,78 @@
   --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
   --ease-snappy: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-smooth: cubic-bezier(0.33, 1, 0.68, 1);
+  /* Motion Contract: Immutable animation timings */
+  --motion/fadeIn: 0.25s ease;
+  --motion/fadeIn-delayed: 1s ease-out;
+  --motion/fadeIn-delayed-0-2s: 1s ease-out 0.2s both;
+  --motion/fadeIn-delayed-0-3s: 1s ease-out 0.3s both;
+  --motion/fadeIn-delayed-0-4s: 1s ease-out 0.4s both;
+  --motion/fadeIn-delayed-0-8s: 1s ease-out 0.8s both;
+  --motion/fadeInUp: 0.8s ease-out 0.6s both;
+  --motion/fadeInDown: 0.8s ease-out;
+  --motion/modalFloat: 0.5s var(--ease-overshoot);
+  --motion/dropdownReveal: 0.28s var(--ease-snappy);
+  --motion/tileEntry: 0.6s ease-out both;
+  --motion/panelCardLift: 0.6s ease both;
+  --motion/accordionReveal: 0.45s var(--ease-smooth);
+  --motion/cpFade: 280ms ease-out both;
+  --motion/shimmerLine: 3.2s cubic-bezier(0.42, 0, 0.58, 1) infinite;
+  --motion/ambientGlow: 10s ease-in-out infinite;
+  --motion/thermalWave: 3s ease-in-out infinite;
+  --motion/livePulse: 2s ease-in-out infinite;
+  --motion/statusPulse: 2s ease-in-out infinite;
+  --motion/fetchingPulse: 1.5s ease-in-out infinite;
+  --motion/invalidPulse: 2s ease-in-out infinite;
+  --motion/pulse: 2s ease-in-out infinite;
+  --motion/pulseFast: 1s ease-in-out infinite;
+  --motion/breathe: 3s ease-in-out infinite;
+  --motion/breatheSlow: 4s ease-in-out infinite;
+  --motion/spin: 0.8s linear infinite;
+  /* Semantic Tokens: Role-based aliases (no visual change) */
+  /* Colors */
+  --color/surface/input-bg: var(--surface-input-bg);
+  --color/surface/card-bg: var(--panel-card-bg);
+  --color/surface/panel-bg: var(--panel-surface);
+  --color/text/primary: var(--text-primary);
+  --color/text/secondary: var(--text-secondary);
+  --color/text/muted: var(--panel-text-muted);
+  --color/border/subtle: var(--accent-border-subtle);
+  --color/border/medium: var(--accent-border-medium);
+  --color/border/strong: var(--accent-border-strong);
+  --color/accent/primary: var(--accent-primary);
+  --color/accent/secondary: var(--accent-secondary);
+  --color/accent/tertiary: var(--accent-tertiary);
+  /* Spacing (magic numbers) */
+  --space/xs: 8px;
+  --space/sm: 12px;
+  --space/md: 14px;
+  --space/lg: 18px;
+  --space/xl: 20px;
+  --space/2xl: 24px;
+  --space/3xl: 28px;
+  --space/4xl: 32px;
+  --space/5xl: 40px;
+  /* Border Radius */
+  --radius/sm: 10px;
+  --radius/md: 12px;
+  --radius/lg: 14px;
+  --radius/xl: 16px;
+  --radius/2xl: 18px;
+  --radius/3xl: 20px;
+  --radius/4xl: 24px;
+  --radius/full: 50%;
+  --radius/pill: 999px;
+  /* Elevation (Box Shadows) */
+  --elevation/1: 0 2px 8px rgba(0, 0, 0, 0.2);
+  --elevation/2: 0 4px 12px rgba(0, 0, 0, 0.2);
+  --elevation/3: 0 10px 28px rgba(0, 0, 0, 0.35);
+  --elevation/4: 0 10px 40px rgba(0, 0, 0, 0.4);
+  --elevation/5: 0 16px 40px rgba(0, 0, 0, 0.4);
+  --elevation/6: 0 24px 48px rgba(0, 0, 0, 0.5);
+  --elevation/modal: 0 30px 70px rgba(0, 0, 0, 0.55);
+  /* Component-specific heights */
+  --height/input: 52px;
+  --height/button: 44px;
   --tile-neutral-1: #2a2a2a;
   --tile-neutral-2: #1a1a1a;
   --tile-neutral-brightness: 0.9;
@@ -584,4 +660,5 @@ body[data-theme="monochrome"] {
     var(--accent-secondary),
     var(--accent-primary)
   );
+}
 }

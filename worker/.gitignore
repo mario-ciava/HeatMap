@@ -1,0 +1,18 @@
+# Wrangler generated files
+.wrangler/
+wrangler.toml.backup
+
+# Environment variables (if you create a local .env file - DON'T!)
+.env
+.dev.vars
+
+# Node modules (if you add dependencies)
+node_modules/
+package-lock.json
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db

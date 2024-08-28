@@ -1,3 +1,4 @@
+@layer overrides {
 /* Real-mode transitions */
 body.real-mode .control-section.sliders {
   max-height: 0 !important;
@@ -55,7 +56,7 @@ body:not(.real-mode) .api-key-section {
 }
 
 .asset-tile .status-dot.pulsing {
-  animation: livePulse 2s ease-in-out infinite;
+  animation: livePulse var(--motion/livePulse);
 }
 
 .asset-tile .status-dot.open {
@@ -83,4 +84,5 @@ body:not(.real-mode) .api-key-section {
 
 body:not(.real-mode) .asset-tile .status-dot {
   display: none;
+}
 }

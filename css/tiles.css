@@ -1,3 +1,4 @@
+@layer components {
 /* Add Tile Styles - Minimal and Elegant */
 .add-tile {
   position: relative;
@@ -116,8 +117,10 @@
     0 10px 40px rgba(0, 0, 0, 0.4),
     0 0 0 1px var(--accent-glow-soft) inset;
   position: relative;
-  animation: fadeIn 1s ease-out 0.4s both;
+  animation: fadeIn var(--motion/fadeIn-delayed-0-4s);
   transition: all 0.4s var(--ease-smooth);
+  content-visibility: auto;
+  contain-intrinsic-size: 800px;
 }
 
 /* Asset tiles */
@@ -135,15 +138,14 @@
     var(--tile-color-2) 100%
   );
   cursor: pointer;
-  transform-style: preserve-3d;
   overflow: hidden;
+  contain: paint;
   --tile-hover-lift: 6px;
   --tile-hover-brightness: 1.08;
   --tile-hover-saturation: 1.05;
   --tile-color-1: var(--tile-neutral-1, #2a2a2a);
   --tile-color-2: var(--tile-neutral-2, #1a1a1a);
   transition:
-    transform 0.35s var(--ease-standard),
     filter 0.75s var(--ease-smooth),
     box-shadow 0.75s var(--ease-smooth),
     background 0.75s var(--ease-smooth);
@@ -151,7 +153,7 @@
 }
 
 .asset-tile.tile-enter {
-  animation: tileEntry 0.6s ease-out both;
+  animation: tileEntry var(--motion/tileEntry);
 }
 
 .asset-tile.tile-state-change {
@@ -230,8 +232,15 @@
   --tile-color-1: var(--gain-medium);
   --tile-color-2: var(--gain-high);
   filter: brightness(var(--thermal-intensity)) saturate(1.3);
-  animation: pulse 2s ease-in-out infinite;
+  animation-name: pulse !important;
+  animation-duration: 2s !important;
+  animation-timing-function: ease-in-out !important;
+  animation-iteration-count: infinite !important;
+  animation-fill-mode: both !important;
   box-shadow: 0 0 32px var(--tile-glow-positive-soft, rgba(255, 74, 46, 0.25));
+  transition-property: filter, box-shadow, background !important;
+  transition-duration: 0.75s;
+  transition-timing-function: var(--ease-smooth);
 }
 
 .asset-tile.gaining-strong {
@@ -239,15 +248,29 @@
   --tile-color-2: var(--gain-extreme);
   filter: brightness(calc(var(--thermal-intensity) * 1.25)) saturate(1.5)
     hue-rotate(-10deg);
-  animation: pulseFast 1s ease-in-out infinite;
+  animation-name: pulseFast !important;
+  animation-duration: 1s !important;
+  animation-timing-function: ease-in-out !important;
+  animation-iteration-count: infinite !important;
+  animation-fill-mode: both !important;
   box-shadow: 0 0 42px var(--tile-glow-positive-strong, rgba(255, 74, 46, 0.55));
+  transition-property: filter, box-shadow, background !important;
+  transition-duration: 0.75s;
+  transition-timing-function: var(--ease-smooth);
 }
 
 .asset-tile.losing {
   --tile-color-1: var(--loss-medium);
   --tile-color-2: var(--loss-high);
   filter: brightness(calc(var(--thermal-intensity) * 0.85)) saturate(0.9);
-  animation: breathe 3s ease-in-out infinite;
+  animation-name: breathe !important;
+  animation-duration: 3s !important;
+  animation-timing-function: ease-in-out !important;
+  animation-iteration-count: infinite !important;
+  animation-fill-mode: both !important;
+  transition-property: filter, box-shadow, background !important;
+  transition-duration: 0.75s;
+  transition-timing-function: var(--ease-smooth);
 }
 
 .asset-tile.losing-strong {
@@ -255,8 +278,14 @@
   --tile-color-2: var(--loss-high);
   filter: brightness(calc(var(--thermal-intensity) * 0.65)) saturate(0.7)
     hue-rotate(20deg);
-  animation: breatheSlow 4s ease-in-out infinite;
-  transform: scale(0.96);
+  animation-name: breatheSlow !important;
+  animation-duration: 4s !important;
+  animation-timing-function: ease-in-out !important;
+  animation-iteration-count: infinite !important;
+  animation-fill-mode: both !important;
+  transition-property: filter, box-shadow, background !important;
+  transition-duration: 0.75s;
+  transition-timing-function: var(--ease-smooth);
 }
 
 .asset-tile.neutral {
@@ -285,19 +314,20 @@ body[data-theme="monochrome"] .asset-tile.losing-strong {
   filter: brightness(0.65) saturate(0.14);
 }
 
-.asset-tile:hover {
+.asset-tile:hover:not(.gaining):not(.gaining-strong):not(.losing):not(.losing-strong) {
   transform: translateY(calc(-1 * var(--tile-hover-lift))) scale(1.015);
   z-index: 10;
   box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5);
   filter: brightness(var(--tile-hover-brightness, 1.08))
     saturate(var(--tile-hover-saturation, 1.05));
+  transition: transform 0.35s var(--ease-standard);
 }
 
 .asset-tile:hover::before {
   opacity: 1;
 }
 
-.asset-tile:active {
+.asset-tile:active:not(.gaining):not(.gaining-strong):not(.losing):not(.losing-strong) {
   transform: translateY(-4px) scale(1.02);
   transition: transform 0.1s ease;
 }
@@ -348,6 +378,7 @@ body[data-theme="monochrome"] .asset-tile.gaining-strong .price {
 .change::before {
   font-size: 0.75rem;
   font-weight: 700;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
 }
 
 .change.positive {
@@ -362,6 +393,10 @@ body[data-theme="monochrome"] .asset-tile.gaining-strong .price {
 
 .change.positive::before {
   content: "▲";
+}
+
+.change.negative::before {
+  content: "▼";
 }
 
 @supports (container-type: inline-size) {
@@ -569,4 +604,5 @@ body[data-theme="monochrome"] .asset-tile.gaining-strong .price {
     height: 80px;
     width: 100%;
   }
+}
 }

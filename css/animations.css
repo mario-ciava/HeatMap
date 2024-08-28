@@ -1,4 +1,5 @@
 /* Global animation definitions */
+@layer utilities {
 @keyframes accordionReveal {
   0% {
     opacity: 0;
@@ -28,10 +29,12 @@
   0%,
   100% {
     opacity: 0.92;
+    transform: scale(1);
   }
 
   50% {
     opacity: 1;
+    transform: scale(0.97);
   }
 }
 
@@ -39,10 +42,12 @@
   0%,
   100% {
     opacity: 0.85;
+    transform: scale(1);
   }
 
   50% {
     opacity: 0.95;
+    transform: scale(0.96);
   }
 }
 
@@ -180,11 +185,13 @@
   0%,
   100% {
     box-shadow: 0 0 25px var(--tile-glow-positive-soft, rgba(255, 74, 46, 0.25));
+    transform: scale(1);
   }
 
   50% {
     box-shadow: 0 0 45px
       var(--tile-glow-positive-strong, rgba(255, 74, 46, 0.45));
+    transform: scale(1.02);
   }
 }
 
@@ -218,11 +225,13 @@
   0%,
   100% {
     box-shadow: 0 0 35px var(--tile-glow-positive-soft, rgba(255, 74, 46, 0.35));
+    transform: scale(1);
   }
 
   50% {
     box-shadow: 0 0 55px
       var(--tile-glow-positive-strong, rgba(255, 74, 46, 0.55));
+    transform: scale(1.03);
   }
 }
 
@@ -288,4 +297,5 @@
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
 }

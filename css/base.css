@@ -1,3 +1,4 @@
+@layer base {
 * {
   margin: 0;
   padding: 0;
@@ -45,7 +46,7 @@ body::before {
       transparent 60%
     );
   pointer-events: none;
-  animation: ambientGlow 10s ease-in-out infinite;
+  animation: ambientGlow var(--motion/ambientGlow);
 }
 
 /* Scrollbar styles for page */
@@ -59,7 +60,7 @@ body::before {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--accent-glow-medium);
+  background: rgba(251, 146, 60, 0.35);
   border-radius: 10px;
   border: 2px solid transparent;
   background-clip: padding-box;
@@ -67,14 +68,61 @@ body::before {
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--accent-glow-strong);
+  background: rgba(251, 146, 60, 0.6);
   background-clip: padding-box;
 }
 
-/* Firefox scrollbar */
-* {
+body[data-theme="matrix"] ::-webkit-scrollbar-thumb {
+  background: rgba(16, 185, 129, 0.35);
+}
+
+body[data-theme="matrix"] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(16, 185, 129, 0.6);
+}
+
+body[data-theme="ocean"] ::-webkit-scrollbar-thumb {
+  background: rgba(56, 189, 248, 0.35);
+}
+
+body[data-theme="ocean"] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(56, 189, 248, 0.6);
+}
+
+body[data-theme="sunset"] ::-webkit-scrollbar-thumb {
+  background: rgba(249, 115, 22, 0.35);
+}
+
+body[data-theme="sunset"] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(249, 115, 22, 0.6);
+}
+
+body[data-theme="monochrome"] ::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.35);
+}
+
+body[data-theme="monochrome"] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.6);
+}
+
+html {
   scrollbar-width: thin;
-  scrollbar-color: var(--accent-glow-medium) rgba(15, 23, 42, 0.6);
+  scrollbar-color: rgba(251, 146, 60, 0.35) rgba(15, 23, 42, 0.6);
+}
+
+body[data-theme="matrix"] {
+  scrollbar-color: rgba(16, 185, 129, 0.35) rgba(15, 23, 42, 0.6);
+}
+
+body[data-theme="ocean"] {
+  scrollbar-color: rgba(56, 189, 248, 0.35) rgba(15, 23, 42, 0.6);
+}
+
+body[data-theme="sunset"] {
+  scrollbar-color: rgba(249, 115, 22, 0.35) rgba(15, 23, 42, 0.6);
+}
+
+body[data-theme="monochrome"] {
+  scrollbar-color: rgba(148, 163, 184, 0.35) rgba(15, 23, 42, 0.6);
 }
 
 .container {
@@ -87,7 +135,7 @@ body::before {
 .header {
   text-align: center;
   margin-bottom: 30px;
-  animation: fadeInDown 0.8s ease-out;
+  animation: fadeInDown var(--motion/fadeInDown);
   padding: 20px;
   background: transparent;
   border-radius: 20px;
@@ -122,4 +170,5 @@ body::before {
   .subtitle {
     font-size: 0.8rem;
   }
+}
 }

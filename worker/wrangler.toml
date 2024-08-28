@@ -1,0 +1,30 @@
+# Cloudflare Worker Configuration
+# Documentation: https://developers.cloudflare.com/workers/wrangler/configuration/
+
+name = "finnhub-proxy"
+main = "worker.js"
+compatibility_date = "2025-10-23"
+workers_dev = true
+
+# Environment Variables (public)
+[vars]
+# Comma-separated list of allowed origins (REQUIRED for security)
+ALLOWED_ORIGINS = "http://localhost:5173,http://localhost:8080,http://127.0.0.1:5173,http://127.0.0.1:8080"
+
+# Optional: Override Finnhub endpoints (use https:// for WebSocket)
+# FINNHUB_REST_BASE = "https://finnhub.io/api/v1"
+# FINNHUB_WS = "https://ws.finnhub.io"
+
+# Optional: Rate limiting configuration
+# RATE_LIMIT_REQUESTS = "50"
+# RATE_LIMIT_WINDOW_MS = "60000"
+
+# Secrets (encrypted, not visible in dashboard after setting)
+# Set via: wrangler secret put FINNHUB_API_KEY
+# Then paste your Finnhub API key when prompted
+
+# IMPORTANT: Before deploying, run:
+# wrangler secret put FINNHUB_API_KEY
+
+# IMPORTANT: Update ALLOWED_ORIGINS to include your production domain
+# Example: ALLOWED_ORIGINS = "http://localhost:5173,https://yourdomain.com"

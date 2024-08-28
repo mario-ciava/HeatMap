@@ -4,8 +4,20 @@
  */
 
 export const CONFIG = {
+  // === Security & Proxy Settings ===
+  SECURITY: {
+    // Force proxy mode: API key is always managed server-side (secure)
+    // Set to false only if you want to test direct API calls in development
+    PROXY_MODE: true, // true = always use proxy (recommended)
+    FORCE_PROXY_MODE: false, // Deprecated (use PROXY_MODE: true instead)
+    // Your Cloudflare Worker URL (can be overridden via VITE_PROXY_URL env var)
+    PROXY_BASE: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_PROXY_URL)
+      || 'https://finnhub-proxy.mariog-ciavarella.workers.dev'
+  },
+
   // === Finnhub API Settings ===
   FINNHUB: {
+    // When PROXY_MODE is true, these will point to your Worker
     WS_URL: 'wss://ws.finnhub.io',
     REST_BASE: 'https://finnhub.io/api/v1',
     
@@ -14,7 +26,7 @@ export const CONFIG = {
       INITIAL_DELAY: 1000,      // Start with 1s
       MAX_DELAY: 30000,         // Cap at 30s
       BACKOFF_MULTIPLIER: 2,    // Double each time
-      MAX_RETRIES: Infinity     // Never give up
+      MAX_RETRIES: 10           // Max 10 retries before giving up
     },
     
     // Rate limiting for REST endpoints
@@ -47,8 +59,10 @@ export const CONFIG = {
   
   // === API Key Settings ===
   API_KEY: {
-    DEFAULT: 'd3n3tqpr01qmso3665q0d3n3tqpr01qmso3665qg',  // Fallback API key from config
-    STORAGE_KEY: 'finnhub_api_key'                      // localStorage key name
+    // API key is managed server-side by Cloudflare Worker (secure)
+    // No sensitive data stored in frontend code
+    LOCAL_DEV_KEY: '', // Empty - proxy handles authentication
+    STORAGE_KEY: 'finnhub_api_key'  // localStorage key (not used in proxy mode)
   },
 
   // === Storage Keys ===
@@ -318,3 +332,62 @@ export const SIMULATION_ASSETS = [
   { ticker: "NEE", name: "NextEra Energy", price: 73.45, basePrice: 73.45, change: 0, sector: "Utilities" },
   { ticker: "COIN", name: "Coinbase", price: 189.34, basePrice: 189.34, change: 0, sector: "Fintech" },
 ];
+
+/**
+ * Detect if running on localhost/development environment
+ * @returns {boolean}
+ */
+export function isLocalDevelopment() {
+  if (typeof window === 'undefined') return true;
+
+  const hostname = window.location.hostname;
+  return hostname === 'localhost'
+    || hostname === '127.0.0.1'
+    || hostname === '0.0.0.0'
+    || hostname.startsWith('192.168.')
+    || hostname.startsWith('10.')
+    || hostname.endsWith('.local');
+}
+
+/**
+ * Determine if proxy mode should be used
+ * @returns {boolean}
+ */
+export function shouldUseProxy() {
+  const security = CONFIG.SECURITY;
+
+  // Explicit override
+  if (security.PROXY_MODE === true) return true;
+  if (security.PROXY_MODE === false) return false;
+
+  // Force proxy for testing locally
+  if (security.FORCE_PROXY_MODE === true) return true;
+
+  // Auto-detect: use proxy only on production domains
+  return !isLocalDevelopment();
+}
+
+/**
+ * Get the appropriate API endpoints based on environment
+ * @returns {Object} { wsUrl, restBase, useProxy, mode }
+ */
+export function getApiEndpoints() {
+  const useProxy = shouldUseProxy();
+
+  if (useProxy) {
+    const proxyBase = CONFIG.SECURITY.PROXY_BASE;
+    return {
+      wsUrl: proxyBase.replace(/^https/, 'wss').replace(/^http/, 'ws') + '/ws',
+      restBase: proxyBase + '/api',
+      useProxy: true,
+      mode: 'proxy'
+    };
+  }
+
+  return {
+    wsUrl: CONFIG.FINNHUB.WS_URL,
+    restBase: CONFIG.FINNHUB.REST_BASE,
+    useProxy: false,
+    mode: 'direct'
+  };
+}

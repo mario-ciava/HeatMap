@@ -397,6 +397,7 @@ let currentTheme = localStorage.getItem("heatmap-theme") || "thermal";
 
 // Apply saved theme on load
 document.body.setAttribute("data-theme", currentTheme);
+document.documentElement.setAttribute("data-theme", currentTheme);
 
 function cycleTheme() {
   const currentIndex = THEMES.indexOf(currentTheme);
@@ -405,6 +406,7 @@ function cycleTheme() {
 
   // Apply theme
   document.body.setAttribute("data-theme", currentTheme);
+  document.documentElement.setAttribute("data-theme", currentTheme);
 
   // Save preference
   try {
