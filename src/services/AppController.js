@@ -409,6 +409,34 @@ export class AppController {
         this._showToast(copied ? "API key copied" : "Unable to copy API key");
       });
     }
+
+    // Pause/Resume fetching button
+    const pauseFetchBtn = document.getElementById("pause-fetch-btn");
+    if (pauseFetchBtn) {
+      pauseFetchBtn.addEventListener("click", () => {
+        const isPaused = pauseFetchBtn.classList.contains("paused");
+
+        if (isPaused) {
+          // Resume fetching
+          const resumed = this.resumeFetching();
+          if (resumed) {
+            pauseFetchBtn.classList.remove("paused");
+            pauseFetchBtn.setAttribute("aria-label", "Pause fetching");
+            pauseFetchBtn.setAttribute("title", "Pause fetching");
+            // Status will be automatically updated to "fetching" by transport events
+          }
+        } else {
+          // Pause fetching
+          const paused = this.pauseFetching();
+          if (paused) {
+            pauseFetchBtn.classList.add("paused");
+            pauseFetchBtn.setAttribute("aria-label", "Resume fetching");
+            pauseFetchBtn.setAttribute("title", "Resume fetching");
+            this._updateStatusIndicator("paused");
+          }
+        }
+      });
+    }
   }
 
   /**
@@ -472,6 +500,43 @@ export class AppController {
     return this.state.getMode() === "simulation" && this.simulation.isRunning();
   }
 
+  pauseFetching() {
+    if (this.state.getMode() !== "real") {
+      log.debug("Cannot pause - not in real mode");
+      return false;
+    }
+
+    if (!this.transport.isRunning) {
+      log.debug("Fetching already paused");
+      return false;
+    }
+
+    this.transport.stop();
+    log.info("Data fetching paused");
+    return true;
+  }
+
+  resumeFetching() {
+    if (this.state.getMode() !== "real") {
+      log.debug("Cannot resume - not in real mode");
+      return false;
+    }
+
+    if (this.transport.isRunning) {
+      log.debug("Fetching already running");
+      return false;
+    }
+
+    const tickers = this.assets.map((a) => a.ticker);
+    this.transport.start(tickers);
+    log.info("Data fetching resumed");
+    return true;
+  }
+
+  isFetchingRunning() {
+    return this.state.getMode() === "real" && this.transport.isRunning;
+  }
+
 
   /**
    * Render all tiles
@@ -519,12 +584,16 @@ export class AppController {
     const textEl = el.querySelector(".status-text");
     if (!dotEl || !textEl) return;
 
-    el.classList.remove("fetching");
+    el.classList.remove("fetching", "paused");
 
     switch (mode) {
       case "fetching":
         el.classList.add("fetching");
         textEl.textContent = message || "Fetching...";
+        break;
+      case "paused":
+        el.classList.add("paused");
+        textEl.textContent = message || "Paused";
         break;
       case "live":
         textEl.textContent = message || "Live";
@@ -549,6 +618,7 @@ export class AppController {
       return date.toLocaleTimeString([], {
         hour: "2-digit",
         minute: "2-digit",
+        second: "2-digit",
       });
     }
 
@@ -557,12 +627,13 @@ export class AppController {
       return date.toLocaleTimeString([], {
         hour: "2-digit",
         minute: "2-digit",
+        second: "2-digit",
       });
     }
 
     // If yesterday
     if (days === 1) {
-      return `Yesterday ${date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+      return `Yesterday ${date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`;
     }
 
     // If 2-3 days ago
@@ -586,6 +657,12 @@ export class AppController {
     const perfId = perfStart("updateFetchingProgress");
     const mode = this.state.getMode();
     if (mode !== "real") {
+      perfEnd(perfId);
+      return;
+    }
+
+    // Don't update status if transport is paused
+    if (!this.transport.isRunning) {
       perfEnd(perfId);
       return;
     }

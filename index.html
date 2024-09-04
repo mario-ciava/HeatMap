@@ -89,6 +89,15 @@
                 >
               </div>
               <div class="mode-switch" title="Real Data / Simulation">
+                <button
+                  class="pause-fetch-btn real-only"
+                  id="pause-fetch-btn"
+                  title="Pause/Resume fetching"
+                  type="button"
+                  aria-label="Pause fetching"
+                >
+                  <span class="pause-icon"></span>
+                </button>
                 <label class="switch">
                   <input
                     aria-label="Real Data"
@@ -150,7 +159,7 @@
           <!-- Real Data: Finnhub API Key management -->
           <div class="control-section api-key-section real-only">
             <details class="api-settings">
-              <summary class="control-label">
+              <summary class="api-settings-label">
                 <span class="icon">🔐</span> Finnhub API Key Settings
               </summary>
               <div class="api-settings-content">
@@ -167,15 +176,16 @@
                         placeholder="Paste your Finnhub API key"
                         type="password"
                       />
-                      <button
-                        class="api-action-btn api-save-btn"
-                        id="api-key-save"
-                        type="button"
-                      >
-                        Save
-                      </button>
-                    </div>
-                  </div>
+                      <div class="api-field-actions">
+                        <button
+                          class="api-action-btn api-save-btn"
+                          id="api-key-save"
+                          type="button"
+                        >
+                          Save
+                        </button>
+                      </div>
+                    </div>                  </div>
 
                   <div class="api-field-block">
                     <label class="api-label" for="api-key-display"
@@ -215,8 +225,6 @@
 
                 <p class="api-info-text">
                   Your API key is stored locally in your browser (LocalStorage).
-                </p>
-                <p class="api-info-text">
                   Get your free API key at
                   <a href="https://finnhub.io" target="_blank" rel="noopener"
                     >finnhub.io</a
@@ -238,6 +246,10 @@
           <span class="stat-value positive" id="gaining">0</span>
         </div>
         <div class="stat">
+          <span class="stat-label">Neutral</span>
+          <span class="stat-value neutral" id="neutral">0</span>
+        </div>
+        <div class="stat">
           <span class="stat-label">Losing</span>
           <span class="stat-value negative" id="losing">0</span>
         </div>
@@ -257,6 +269,10 @@
 
       <div class="heatmap-grid" id="heatmap"></div>
     </div>
+
+    <footer class="page-footer">
+      <p class="footer-copyright">&copy; 2025 Mario Ciavarella</p>
+    </footer>
 
     <div class="controls">
       <button class="control-btn" id="btn-toggle-animation">

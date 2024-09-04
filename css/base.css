@@ -49,6 +49,28 @@ body::before {
   animation: ambientGlow var(--motion/ambientGlow);
 }
 
+/* Footer */
+.page-footer {
+  width: 100%;
+  max-width: 1400px;
+  margin-top: 40px;
+  padding: 20px 24px;
+  text-align: center;
+  opacity: 0.6;
+  transition: opacity 0.3s ease;
+}
+
+.page-footer:hover {
+  opacity: 0.9;
+}
+
+.footer-copyright {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-secondary);
+  letter-spacing: 0.3px;
+}
+
 /* Scrollbar styles for page */
 ::-webkit-scrollbar {
   width: 10px;
@@ -59,6 +81,7 @@ body::before {
   border-radius: 10px;
 }
 
+/* Default theme (fire) */
 ::-webkit-scrollbar-thumb {
   background: rgba(251, 146, 60, 0.35);
   border-radius: 10px;
@@ -97,11 +120,11 @@ body[data-theme="sunset"] ::-webkit-scrollbar-thumb:hover {
 }
 
 body[data-theme="monochrome"] ::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.35);
+  background: rgba(203, 213, 225, 0.35);
 }
 
 body[data-theme="monochrome"] ::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.6);
+  background: rgba(203, 213, 225, 0.6);
 }
 
 html {
@@ -122,7 +145,7 @@ body[data-theme="sunset"] {
 }
 
 body[data-theme="monochrome"] {
-  scrollbar-color: rgba(148, 163, 184, 0.35) rgba(15, 23, 42, 0.6);
+  scrollbar-color: rgba(203, 213, 225, 0.35) rgba(15, 23, 42, 0.6);
 }
 
 .container {

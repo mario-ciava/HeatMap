@@ -1,11 +1,7 @@
-@layer overrides {
+@layer legacy {
 /* Real-mode transitions */
 body.real-mode .control-section.sliders {
-  max-height: 0 !important;
-  opacity: 0 !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  overflow: hidden !important;
+  display: none !important;
 }
 
 body.real-mode .controls {
@@ -26,12 +22,14 @@ body.real-mode .live-indicator {
 }
 
 body.real-mode .heatmap-grid {
-  margin-top: 60px;
+  margin-top: 24px;
 }
 
 body.real-mode .real-only {
   max-height: 1000px;
   opacity: 1;
+  margin: 0;
+  padding: 0;
 }
 
 body:not(.real-mode) .api-key-section {

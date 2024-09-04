@@ -29,6 +29,7 @@ export class ControlPanelView {
     this.#setupThemes();
     this.#setupButtons();
     this.#setupKeyboardShortcuts();
+    this.#setupDetailsAnimation();
 
     document.addEventListener("pointerdown", this._handlePointerDown);
     document.addEventListener("keydown", this._handleKeyDown);
@@ -48,6 +49,7 @@ export class ControlPanelView {
     let sampleCount = 0;
     let gaining = 0;
     let losing = 0;
+    let neutral = 0;
     let totalChange = 0;
     const changes = [];
 
@@ -69,6 +71,7 @@ export class ControlPanelView {
 
         if (change > CONFIG.UI.THRESHOLDS.MILD_GAIN) gaining++;
         else if (change < CONFIG.UI.THRESHOLDS.MILD_LOSS) losing++;
+        else neutral++;
 
         totalChange += change;
         changes.push(Math.abs(change));
@@ -78,6 +81,7 @@ export class ControlPanelView {
 
       document.getElementById("gaining").textContent = gaining;
       document.getElementById("losing").textContent = losing;
+      document.getElementById("neutral").textContent = neutral;
       document.getElementById("totalAssets").textContent = count;
 
       const marketTemp = (((gaining - losing) / count) * 50).toFixed(1);
@@ -275,6 +279,10 @@ export class ControlPanelView {
     const speedValue = document.getElementById("speed-value");
 
     if (speedSlider && speedValue) {
+      // Initialize slider with value from config
+      speedSlider.value = CONFIG.UI.UPDATE_FREQUENCY;
+      speedValue.textContent = `${CONFIG.UI.UPDATE_FREQUENCY}ms`;
+
       const updateSpeedSlider = (slider) => {
         const value = parseInt(slider.value);
         const min = parseInt(slider.min);
@@ -322,6 +330,76 @@ export class ControlPanelView {
     if (btnReset) btnReset.addEventListener("click", this.helpers.resetMarket);
     if (btnExport) btnExport.addEventListener("click", this.helpers.exportToCSV);
     if (btnModalClose) btnModalClose.addEventListener("click", this.helpers.closeModal);
+  }
+
+  #setupDetailsAnimation() {
+    const details = document.querySelector(".api-settings");
+    if (!details) return;
+
+    const summary = details.querySelector(".api-settings-label");
+    const content = details.querySelector(".api-settings-content");
+    if (!summary || !content) return;
+
+    let isAnimating = false;
+
+    summary.addEventListener("click", (e) => {
+      e.preventDefault();
+
+      if (isAnimating) return;
+      isAnimating = true;
+
+      if (!details.open) {
+        // Opening
+        details.open = true;
+        content.style.overflow = "hidden";
+        content.style.opacity = "0";
+        const fullHeight = content.scrollHeight;
+        content.style.height = "0px";
+
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            content.style.transition = "height 0.5s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s ease";
+            content.style.height = `${fullHeight}px`;
+            content.style.opacity = "1";
+          });
+        });
+
+        const onTransitionEnd = () => {
+          content.style.height = "";
+          content.style.overflow = "";
+          content.style.transition = "";
+          content.style.opacity = "";
+          isAnimating = false;
+          content.removeEventListener("transitionend", onTransitionEnd);
+        };
+        content.addEventListener("transitionend", onTransitionEnd, { once: true });
+      } else {
+        // Closing
+        const fullHeight = content.scrollHeight;
+        content.style.height = `${fullHeight}px`;
+        content.style.overflow = "hidden";
+        content.style.opacity = "1";
+
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            content.style.transition = "height 0.5s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease";
+            content.style.height = "0px";
+            content.style.opacity = "0";
+          });
+        });
+
+        const onTransitionEnd = () => {
+          details.open = false;
+          content.style.height = "";
+          content.style.overflow = "";
+          content.style.transition = "";
+          content.style.opacity = "";
+          isAnimating = false;
+          content.removeEventListener("transitionend", onTransitionEnd);
+        };
+        content.addEventListener("transitionend", onTransitionEnd, { once: true });
+      }
+    });
   }
 
   #enhanceDropdown(select) {
