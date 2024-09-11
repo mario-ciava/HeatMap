@@ -35,21 +35,33 @@ export default {
       // Validate configuration
       const validation = config.validate();
       if (!validation.valid) {
-        console.error("Configuration error:", validation.error);
+        // SECURITY: Log detailed error server-side, show generic message to client
+        console.error("[WORKER] Configuration validation failed:", {
+          error: validation.error,
+          hint: validation.hint
+        });
+
         return new Response(JSON.stringify({
-          error: "Server configuration error",
-          details: validation.error
+          error: "Service temporarily unavailable",
+          message: "Server configuration issue - please contact administrator"
         }), {
-          status: 500,
+          status: 503,
           headers: { "Content-Type": "application/json" }
         });
       }
+
+      // Log successful initialization (without sensitive data)
+      console.log("[WORKER] Initialized successfully:", config.getSummary());
+
     } catch (error) {
-      console.error("Worker initialization error:", error);
+      // SECURITY: Log detailed error server-side, show generic message to client
+      console.error("[WORKER] Initialization exception:", error);
+
       return new Response(JSON.stringify({
-        error: "Server initialization failed"
+        error: "Service temporarily unavailable",
+        message: "Server initialization failed - please contact administrator"
       }), {
-        status: 500,
+        status: 503,
         headers: { "Content-Type": "application/json" }
       });
     }

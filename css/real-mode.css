@@ -54,7 +54,7 @@ body:not(.real-mode) .api-key-section {
 }
 
 .asset-tile .status-dot.pulsing {
-  animation: livePulse var(--motion/livePulse);
+  animation: livePulse var(--motion-livePulse);
 }
 
 .asset-tile .status-dot.open {

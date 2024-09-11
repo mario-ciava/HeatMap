@@ -259,7 +259,8 @@ export class ControlPanelView {
         const min = parseFloat(slider.min);
         const max = parseFloat(slider.max);
         const progress = ((value - min) / (max - min)) * 100;
-        slider.style.setProperty("--slider-progress", `${progress}%`);
+        const padded = progress <= 0 ? 0 : Math.min(progress + 2, 100);
+        slider.style.setProperty("--slider-progress", `${padded}%`);
       };
 
       updateVolatilitySlider(volatilitySlider);
@@ -288,7 +289,8 @@ export class ControlPanelView {
         const min = parseInt(slider.min);
         const max = parseInt(slider.max);
         const progress = ((value - min) / (max - min)) * 100;
-        slider.style.setProperty("--slider-progress", `${progress}%`);
+        const padded = progress <= 0 ? 0 : Math.min(progress + 2, 100);
+        slider.style.setProperty("--slider-progress", `${padded}%`);
       };
 
       updateSpeedSlider(speedSlider);

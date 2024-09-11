@@ -1,6 +1,11 @@
 /**
  * REST API Handler
  * Proxies REST requests to Finnhub with server-side token injection
+ *
+ * SECURITY:
+ * - Path allow-list: only configured endpoints are accessible
+ * - Rate limiting: strict per-IP enforcement (no fallback)
+ * - Token injection: server-side only, never exposed to client
  */
 
 import { isAllowedOrigin, withCORS } from './cors.js';
@@ -14,6 +19,31 @@ function stripClientToken(searchParams) {
   if (searchParams.has("token")) {
     searchParams.delete("token");
   }
+}
+
+/**
+ * Extract base path from URL (without query params)
+ * @param {URL} url
+ * @returns {string} Base path (e.g., '/quote')
+ */
+function extractBasePath(url) {
+  // Remove /api prefix and extract path without query string
+  const fullPath = url.pathname.replace(/^\/api/, "");
+
+  // Get base path (first segment after /api)
+  // Examples: /quote?symbol=AAPL -> /quote
+  //           /stock/market-status -> /stock/market-status
+  return fullPath.split('?')[0];
+}
+
+/**
+ * Check if requested path is allowed
+ * @param {string} path - Requested path
+ * @param {Set<string>} allowedPaths - Set of allowed paths
+ * @returns {boolean}
+ */
+function isPathAllowed(path, allowedPaths) {
+  return allowedPaths.has(path);
 }
 
 /**
@@ -71,8 +101,44 @@ export async function handleREST(request, config) {
     );
   }
 
-  // SECURITY: Rate limiting
-  const clientIP = request.headers.get("CF-Connecting-IP") || origin;
+  // SECURITY: Path allow-list (only expose necessary endpoints)
+  const requestUrl = new URL(request.url);
+  const requestedPath = extractBasePath(requestUrl);
+
+  if (!isPathAllowed(requestedPath, config.allowedRestPaths)) {
+    console.warn(`[REST] Blocked path: ${requestedPath}`);
+    return withCORS(
+      new Response(JSON.stringify({
+        error: "Endpoint not available",
+        path: requestedPath
+      }), {
+        status: 403,
+        headers: { "Content-Type": "application/json" }
+      }),
+      origin,
+      config.allowedOrigins
+    );
+  }
+
+  // SECURITY: Rate limiting (strict per-IP, no fallback)
+  // CF-Connecting-IP is always present in Cloudflare Workers
+  const clientIP = request.headers.get("CF-Connecting-IP");
+
+  if (!clientIP) {
+    // This should never happen in CF Workers, but defense in depth
+    console.error('[REST] CRITICAL: CF-Connecting-IP header missing');
+    return withCORS(
+      new Response(JSON.stringify({
+        error: "Unable to identify client"
+      }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" }
+      }),
+      origin,
+      config.allowedOrigins
+    );
+  }
+
   const rateLimit = checkRateLimit(
     `rest:${clientIP}`,
     config.rateLimitRequests,
@@ -80,6 +146,7 @@ export async function handleREST(request, config) {
   );
 
   if (!rateLimit.allowed) {
+    console.warn(`[REST] Rate limited IP: ${clientIP}`);
     return withCORS(
       rateLimitExceeded(rateLimit),
       origin,

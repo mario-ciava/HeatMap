@@ -117,7 +117,7 @@
     0 10px 40px rgba(0, 0, 0, 0.4),
     0 0 0 1px var(--accent-glow-soft) inset;
   position: relative;
-  animation: fadeIn var(--motion/fadeIn-delayed-0-4s);
+  animation: fadeIn var(--motion-fadeIn-delayed-0-4s);
   transition: all 0.4s var(--ease-smooth);
   content-visibility: auto;
   contain-intrinsic-size: 800px;
@@ -153,7 +153,7 @@
 }
 
 .asset-tile.tile-enter {
-  animation: tileEntry var(--motion/tileEntry);
+  animation: tileEntry var(--motion-tileEntry);
 }
 
 .asset-tile.tile-state-change {

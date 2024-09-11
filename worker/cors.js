@@ -1,23 +1,57 @@
 /**
  * CORS Handler
  * Secure CORS implementation with strict origin validation
+ *
+ * SECURITY:
+ * - Wildcards (*) are NEVER allowed
+ * - 'null' origin is NEVER allowed
+ * - Origins must be pre-validated and normalized by config.js
+ * - Case-insensitive matching (origins already lowercased)
  */
 
 /**
  * Check if origin is allowed
- * @param {string} origin - Request origin
- * @param {string[]} allowedOrigins - List of allowed origins
+ * @param {string} origin - Request origin (from request header)
+ * @param {string[]} allowedOrigins - Pre-validated list from config
  * @returns {boolean}
  */
 export function isAllowedOrigin(origin, allowedOrigins) {
-  // SECURITY: No origin = server-to-server = BLOCKED
-  if (!origin) return false;
+  // SECURITY: No origin header = BLOCKED (server-to-server requests)
+  if (!origin) {
+    console.warn('[CORS] Blocked request: missing Origin header');
+    return false;
+  }
 
   // SECURITY: Empty allowlist = BLOCKED (must be explicitly configured)
-  if (allowedOrigins.length === 0) return false;
+  if (!allowedOrigins || allowedOrigins.length === 0) {
+    console.error('[CORS] Blocked request: allowedOrigins not configured');
+    return false;
+  }
 
-  // Check against allowlist
-  return allowedOrigins.includes("*") || allowedOrigins.includes(origin);
+  // SECURITY: Explicit rejection of 'null' origin
+  if (origin.toLowerCase() === 'null') {
+    console.warn('[CORS] Blocked request: null origin not allowed');
+    return false;
+  }
+
+  // Normalize incoming origin for comparison
+  const normalizedOrigin = origin.trim().toLowerCase();
+
+  // SECURITY: Wildcards are NEVER allowed in config
+  // (config.js already validates this, but double-check for defense in depth)
+  if (allowedOrigins.includes('*')) {
+    console.error('[CORS] CRITICAL: Wildcard (*) found in allowedOrigins - rejecting ALL requests');
+    return false;
+  }
+
+  // Check against allowlist (exact match, case-insensitive)
+  const allowed = allowedOrigins.includes(normalizedOrigin);
+
+  if (!allowed) {
+    console.warn(`[CORS] Blocked origin: ${origin}`);
+  }
+
+  return allowed;
 }
 
 /**

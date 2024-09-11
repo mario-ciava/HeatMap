@@ -9,11 +9,11 @@
   padding: 0;
   margin-bottom: 28px;
   margin-top: 100px;
-  animation: fadeIn var(--motion/fadeIn-delayed-0-2s);
+  animation: fadeIn var(--motion-fadeIn-delayed-0-2s);
   box-shadow:
     0 10px 40px rgba(0, 0, 0, 0.4),
     0 0 0 1px var(--accent-glow-soft) inset;
-  overflow: visible;
+  overflow: hidden;
   position: relative;
   transition: all 0.5s var(--ease-smooth);
 }
@@ -35,7 +35,7 @@
     transparent 100%
   );
   background-size: 200% 100%;
-  animation: shimmerLine var(--motion/shimmerLine);
+  animation: shimmerLine var(--motion-shimmerLine);
   box-shadow: 0 0 18px rgba(255, 255, 255, 0.4);
   z-index: 2;
 }
@@ -60,21 +60,6 @@
   pointer-events: none;
   z-index: 0;
   transition: opacity 0.6s var(--ease-smooth), background 0.6s var(--ease-smooth);
-}
-
-@keyframes shimmerLine {
-  0% {
-    opacity: 0.6;
-    background-position: -100% 0;
-  }
-  50% {
-    opacity: 1;
-    background-position: 0% 0;
-  }
-  100% {
-    opacity: 0.6;
-    background-position: 100% 0;
-  }
 }
 
 .control-panel > * {
@@ -151,7 +136,7 @@
   height: 10px;
   background: #10b981;
   border-radius: 50%;
-  animation: statusPulse var(--motion/statusPulse) !important;
+  animation: statusPulse var(--motion-statusPulse) !important;
   box-shadow: 0 0 10px rgba(16, 185, 129, 0.6);
   flex-shrink: 0;
 }
@@ -172,7 +157,7 @@
 .status-indicator.fetching .status-dot {
   background: #fbbf24;
   box-shadow: 0 0 10px rgba(251, 191, 36, 0.6);
-  animation: fetchingPulse var(--motion/fetchingPulse) !important;
+  animation: fetchingPulse var(--motion-fetchingPulse) !important;
 }
 
 /* Paused state */
@@ -244,7 +229,7 @@
   border: 1px solid var(--accent-border-subtle);
   background: var(--surface-glass-soft);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-  animation: panelCardLift var(--motion/panelCardLift);
+  animation: panelCardLift var(--motion-panelCardLift);
   position: relative;
   overflow: hidden;
   transition: all 0.4s var(--ease-smooth);
@@ -456,7 +441,7 @@
   opacity: 1;
   pointer-events: auto;
   transform: translateY(0) scale(1);
-  animation: dropdownReveal var(--motion/dropdownReveal);
+  animation: dropdownReveal var(--motion-dropdownReveal);
 }
 
 .select-dropdown::-webkit-scrollbar {
@@ -791,7 +776,7 @@ input[type="range"]::-webkit-slider-runnable-track {
   background:
     linear-gradient(90deg, var(--accent-glow-strong), var(--accent-glow-medium)) no-repeat,
     linear-gradient(90deg, rgba(17, 24, 39, 0.82), rgba(15, 23, 42, 0.96)) no-repeat;
-  background-size: calc(var(--slider-progress, 0%) + 2%) 100%, 100% 100%;
+  background-size: var(--slider-progress, 0%) 100%, 100% 100%;
   background-position: left center, left center;
   background-color: transparent;
   height: 9px;
@@ -807,7 +792,7 @@ input[type="range"]::-moz-range-track {
   background:
     linear-gradient(90deg, var(--accent-glow-strong), var(--accent-glow-medium)) no-repeat,
     linear-gradient(90deg, rgba(17, 24, 39, 0.82), rgba(15, 23, 42, 0.96)) no-repeat;
-  background-size: calc(var(--slider-progress, 0%) + 2%) 100%, 100% 100%;
+  background-size: var(--slider-progress, 0%) 100%, 100% 100%;
   background-position: left center, left center;
   background-color: transparent;
   background-repeat: no-repeat;
@@ -1290,7 +1275,7 @@ input[type="range"]::-moz-range-progress {
 .api-field:has(.api-input.invalid) {
   border-color: rgba(239, 68, 68, 0.75);
   box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.45);
-  animation: invalidPulse var(--motion/invalidPulse);
+  animation: invalidPulse var(--motion-invalidPulse);
 }
 
 .api-field:has(.api-input.invalid) .api-input {
@@ -1342,13 +1327,13 @@ input[type="range"]::-moz-range-progress {
   border-radius: 50%;
   background-color: #f59e0b;
   box-shadow: 0 0 10px rgba(245, 158, 11, 0.6);
-  animation: pulse-orange var(--motion/pulse);
+  animation: pulse-orange var(--motion-pulse);
 }
 
 .fetching-indicator.complete {
   background-color: #10b981;
   box-shadow: 0 0 10px rgba(16, 185, 129, 0.6);
-  animation: pulse-green var(--motion/pulse);
+  animation: pulse-green var(--motion-pulse);
 }
 
 .spinner {
@@ -1358,11 +1343,11 @@ input[type="range"]::-moz-range-progress {
   border: 2px solid rgba(255, 255, 255, 0.2);
   border-top-color: #fb923c;
   border-radius: 50%;
-  animation: spin var(--motion/spin);
+  animation: spin var(--motion-spin);
 }
 
 .cp-fade-in {
-  animation: cpFade var(--motion/cpFade);
+  animation: cpFade var(--motion-cpFade);
 }
 
 @media (max-width: 640px) {
@@ -1410,4 +1395,21 @@ input[type="range"]::-moz-range-progress {
   box-shadow: var(--panel-focus-ring);
   border-color: var(--accent-border-strong);
 }
+}
+
+@keyframes shimmerLine {
+  0% {
+    opacity: 0.6;
+    background-position: -100% 0;
+  }
+
+  50% {
+    opacity: 1;
+    background-position: 0% 0;
+  }
+
+  100% {
+    opacity: 0.6;
+    background-position: 100% 0;
+  }
 }

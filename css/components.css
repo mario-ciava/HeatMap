@@ -12,7 +12,7 @@
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  animation: fadeIn var(--motion/fadeIn);
+  animation: fadeIn var(--motion-fadeIn);
 }
 
 .modal-overlay.active {
@@ -43,7 +43,7 @@
     0 30px 70px rgba(0, 0, 0, 0.55),
     0 0 0 1px var(--accent-glow-soft) inset;
   backdrop-filter: blur(28px);
-  animation: modalFloat var(--motion/modalFloat);
+  animation: modalFloat var(--motion-modalFloat);
   scroll-behavior: smooth;
   clip-path: inset(0 round 18px);
 }
@@ -330,7 +330,7 @@
   top: 24px;
   right: 60px;
   z-index: 100;
-  animation: fadeIn var(--motion/fadeIn-delayed-0-8s);
+  animation: fadeIn var(--motion-fadeIn-delayed-0-8s);
 }
 
 .theme-btn {
@@ -406,7 +406,7 @@
   display: flex;
   gap: 14px;
   z-index: 100;
-  animation: fadeInUp var(--motion/fadeInUp);
+  animation: fadeInUp var(--motion-fadeInUp);
   max-height: 500px;
   opacity: 1;
   overflow: visible;
@@ -478,7 +478,7 @@
 /* Thermal wave effect */
 
 .thermal-active {
-  animation: thermalWave var(--motion/thermalWave);
+  animation: thermalWave var(--motion-thermalWave);
 }
 
 /* Performance indicator */
@@ -506,7 +506,7 @@
   box-shadow:
     0 10px 40px rgba(0, 0, 0, 0.4),
     0 0 0 1px var(--accent-glow-soft) inset;
-  animation: fadeIn var(--motion/fadeIn-delayed-0-3s);
+  animation: fadeIn var(--motion-fadeIn-delayed-0-3s);
   transition:
     transform 0.4s var(--ease-smooth),
     box-shadow 0.4s var(--ease-smooth),

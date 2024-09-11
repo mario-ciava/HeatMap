@@ -4,6 +4,23 @@
     <meta charset="utf-8" />
     <meta content="width=device-width, initial-scale=1.0" name="viewport" />
     <title>Advanced Profit/Loss Heatmap - Enhanced Edition</title>
+
+    <!-- Security Headers (meta tag compatible only) -->
+    <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+    <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin" />
+
+    <!-- Content Security Policy (meta-compatible directives only) -->
+    <meta http-equiv="Content-Security-Policy" content="
+      default-src 'self';
+      script-src 'self';
+      style-src 'self' 'unsafe-inline';
+      img-src 'self' data:;
+      font-src 'self';
+      connect-src 'self' https://finnhub.io wss://finnhub.io https://*.workers.dev wss://*.workers.dev;
+      base-uri 'self';
+      form-action 'self';
+    " />
+
     <link
       rel="icon"
       href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>📊</text></svg>"
