@@ -1,0 +1,47 @@
+name: heatmap
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: heatmap-app
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/healthz || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    networks:
+      edge:
+        aliases:
+          - heatmap-app
+    depends_on:
+      - proxy
+
+  proxy:
+    build:
+      context: ./proxy
+      dockerfile: Dockerfile
+    container_name: heatmap-proxy
+    restart: unless-stopped
+    env_file:
+      - .env.proxy
+    environment:
+      PORT: ${PROXY_PORT:-8080}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:${PROXY_PORT:-8080}/healthz || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    networks:
+      edge:
+        aliases:
+          - heatmap-proxy
+
+networks:
+  edge:
+    external: true
+    name: shared-edge

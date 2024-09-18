@@ -35,6 +35,14 @@ export class ControlPanelView {
     document.addEventListener("keydown", this._handleKeyDown);
   }
 
+  setAssets(assets) {
+    this.assets = assets;
+  }
+
+  #getAssets() {
+    return this.app?.assets || this.assets || [];
+  }
+
   scheduleStatsUpdate() {
     if (this.statsUpdateScheduled) return;
     this.statsUpdateScheduled = true;
@@ -63,7 +71,7 @@ export class ControlPanelView {
         const index = parseInt(tile.dataset.index);
         if (Number.isNaN(index)) return;
 
-        const asset = this.assets[index];
+        const asset = this.#getAssets()[index];
         if (!asset) return;
 
         const tileState = this.app.state.getTile(asset.ticker);
@@ -144,7 +152,7 @@ export class ControlPanelView {
         const index = parseInt(tile.dataset.index);
         if (Number.isNaN(index)) return;
 
-        const asset = this.assets[index];
+        const asset = this.#getAssets()[index];
         if (!asset) return;
 
         const tileState = this.app.state.getTile(asset.ticker);
@@ -216,8 +224,8 @@ export class ControlPanelView {
 
         if (Number.isNaN(indexA) || Number.isNaN(indexB)) return 0;
 
-        const assetA = this.assets[indexA];
-        const assetB = this.assets[indexB];
+        const assetA = this.#getAssets()[indexA];
+        const assetB = this.#getAssets()[indexB];
 
         if (!assetA || !assetB) return 0;
 
@@ -608,7 +616,7 @@ export class ControlPanelView {
       if (tile) {
         const index = parseInt(tile.dataset.index);
         if (!Number.isNaN(index)) {
-          const asset = this.assets[index];
+          const asset = this.#getAssets()[index];
           if (asset && this.app?.tileRegistry) {
             const cached = this.app.tileRegistry.getCacheByTicker(asset.ticker);
             if (cached) {
@@ -630,7 +638,7 @@ export class ControlPanelView {
         if (tile) {
           const index = parseInt(tile.dataset.index);
           if (!Number.isNaN(index)) {
-            const asset = this.assets[index];
+            const asset = this.#getAssets()[index];
             if (asset && this.app?.paintTile) {
               this.app.paintTile(asset.ticker, index);
             }

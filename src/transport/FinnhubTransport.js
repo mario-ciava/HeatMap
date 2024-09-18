@@ -205,6 +205,33 @@ export class FinnhubTransport extends EventEmitter {
   }
 
   /**
+   * Search Finnhub symbols via REST client
+   * @param {string} query
+   * @returns {Promise<Array>}
+   */
+  async searchSymbols(query) {
+    if (!this.rest) return [];
+    return this.rest.searchSymbols(query);
+  }
+
+  /**
+   * Replace desired ticker subscriptions without restarting
+   * @param {string[]} tickers
+   */
+  setDesiredTickers(tickers = []) {
+    this.subscribedTickers = new Set(tickers);
+  }
+
+  /**
+   * Fetch a single quote via REST (strict mode)
+   * @param {string} ticker
+   * @returns {Promise<Object|null>}
+   */
+  async fetchQuoteDirect(ticker) {
+    return this.rest.fetchQuote(ticker, undefined, { strict: true });
+  }
+
+  /**
    * Check if market is open for a ticker (deterministic logic)
    * Returns: true if open, false if closed, null if unknown
    * @param {string} ticker

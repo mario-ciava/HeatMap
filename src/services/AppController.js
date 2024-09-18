@@ -55,6 +55,8 @@ export class AppController {
       assets: this.assets,
     });
 
+    this.assetsResolver = null;
+
     log.info("AppController initialized");
   }
 
@@ -155,7 +157,7 @@ export class AppController {
 
     // Switch to appropriate asset list for the mode
     if (isSwitchingAssets) {
-      const newAssets = mode === 'simulation' ? SIMULATION_ASSETS : REAL_DATA_ASSETS;
+      const newAssets = this._resolveAssetsForMode(mode);
       this.switchAssets(newAssets, mode);
     }
 
@@ -328,6 +330,10 @@ export class AppController {
       ) {
         this._showToast("Invalid API key - check settings");
         this._markApiKeyAsInvalid();
+      } else if (error.code === "FORBIDDEN_ORIGIN") {
+        this._showToast(
+          "Proxy blocked this domain. Redeploy the Worker with the correct ALLOWED_ORIGINS.",
+        );
       }
     });
   }
@@ -933,5 +939,96 @@ export class AppController {
       transport: this.transport.getStatus(),
       tiles: this.state.getAllTiles().size,
     };
+  }
+
+  /**
+   * Provide a resolver for assets per mode (external source e.g. custom tickers)
+   * @param {(mode: 'simulation' | 'real') => Array} resolver
+   */
+  setAssetsResolver(resolver) {
+    if (typeof resolver === "function") {
+      this.assetsResolver = resolver;
+    }
+  }
+
+  /**
+   * Refresh assets for current mode using resolver or provided array
+   * @param {Array} [nextAssets]
+   * @param {Object} [options]
+   */
+  applyExternalAssets(nextAssets, options = {}) {
+    const mode = options.mode || this.state.getMode();
+    const resolvedAssets = Array.isArray(nextAssets)
+      ? nextAssets
+      : this._resolveAssetsForMode(mode);
+
+    this.switchAssets(resolvedAssets, mode);
+
+    if (mode === "real") {
+      const tickers = resolvedAssets.map((a) => a.ticker);
+      this.fetchingTotal = tickers.length;
+      this.fetchingCompleted = 0;
+      this.fetchingJustCompleted = false;
+      this._updateFetchingProgress();
+
+      if (this.transport.isRunning) {
+        this.simulation.stopTransport();
+        setTimeout(() => {
+          this.simulation.startTransport(tickers);
+        }, 350);
+      } else {
+        this.transport.setDesiredTickers?.(tickers);
+        if (!this.transport.setDesiredTickers) {
+          this.transport.subscribedTickers = new Set(tickers);
+        }
+      }
+    } else {
+      this.simulation.assets = resolvedAssets;
+      if (!this.simulation.isRunning()) {
+        this.simulation.start();
+      }
+    }
+
+    if (!options.silent) {
+      this._showToast(options.toastMessage || "Heatmap updated");
+    }
+  }
+
+  /**
+   * Resolve base assets for a mode
+   * @private
+   */
+  _resolveAssetsForMode(mode) {
+    if (typeof this.assetsResolver === "function") {
+      return this.assetsResolver(mode);
+    }
+    return mode === "simulation" ? SIMULATION_ASSETS : REAL_DATA_ASSETS;
+  }
+
+  /**
+   * Search tickers using the transport's REST client
+   * @param {string} query
+   * @returns {Promise<Array>}
+   */
+  async searchSymbols(query) {
+    return this.transport.searchSymbols(query);
+  }
+
+  /**
+   * External hook for toasts
+   * @param {string} message
+   * @param {number} duration
+   */
+  notify(message, duration) {
+    this._showToast(message, duration);
+  }
+
+  /**
+   * Fetch a single quote immediately (used for manual ticker additions)
+   * @param {string} ticker
+   * @returns {Promise<Object|null>}
+   */
+  async fetchQuoteDirect(ticker) {
+    return this.transport.fetchQuoteDirect(ticker);
   }
 }

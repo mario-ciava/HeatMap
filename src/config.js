@@ -3,6 +3,26 @@
  * All app-wide constants and settings
  */
 
+function computeDefaultProxyBase() {
+  if (typeof window !== "undefined" && window.location?.origin) {
+    return `${window.location.origin.replace(/\/$/, "")}/proxy`;
+  }
+  if (typeof globalThis !== "undefined" && globalThis.location?.origin) {
+    return `${globalThis.location.origin.replace(/\/$/, "")}/proxy`;
+  }
+  return "http://localhost:8080/proxy";
+}
+
+const runtimeProxyOverride =
+  typeof globalThis !== "undefined" && globalThis.__HEATMAP_PROXY_BASE
+    ? String(globalThis.__HEATMAP_PROXY_BASE).replace(/\/$/, "")
+    : null;
+
+const DEFAULT_PROXY_BASE =
+  (typeof import.meta !== "undefined" && import.meta.env?.VITE_PROXY_URL)
+    || runtimeProxyOverride
+    || computeDefaultProxyBase();
+
 export const CONFIG = {
   // === Security & Proxy Settings ===
   SECURITY: {
@@ -10,9 +30,8 @@ export const CONFIG = {
     // Set to false only if you want to test direct API calls in development
     PROXY_MODE: true, // true = always use proxy (recommended)
     FORCE_PROXY_MODE: false, // Deprecated (use PROXY_MODE: true instead)
-    // Your Cloudflare Worker URL (can be overridden via VITE_PROXY_URL env var)
-    PROXY_BASE: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_PROXY_URL)
-      || 'https://finnhub-proxy.mariog-ciavarella.workers.dev'
+    // Base URL for the VPS proxy (can be overridden via VITE_PROXY_URL env var)
+    PROXY_BASE: DEFAULT_PROXY_BASE
   },
 
   // === Finnhub API Settings ===
@@ -59,7 +78,7 @@ export const CONFIG = {
   
   // === API Key Settings ===
   API_KEY: {
-    // API key is managed server-side by Cloudflare Worker (secure)
+    // API key is managed server-side by the VPS proxy (secure)
     // No sensitive data stored in frontend code
     LOCAL_DEV_KEY: '', // Empty - proxy handles authentication
     STORAGE_KEY: 'finnhub_api_key'  // localStorage key (not used in proxy mode)

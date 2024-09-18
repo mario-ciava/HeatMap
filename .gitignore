@@ -13,6 +13,7 @@ build/
 
 # Environment variables
 .env
+.env.proxy
 .env.local
 .env.*.local
 .dev.vars
@@ -44,11 +45,6 @@ coverage/
 # OS
 Thumbs.db
 desktop.ini
-
-# Wrangler (Cloudflare Worker)
-worker/.wrangler/
-worker/.dev.vars
-worker/wrangler.toml.backup
 
 # IMPORTANT: Never commit these!
 # These files may contain API keys or secrets

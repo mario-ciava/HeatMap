@@ -72,7 +72,7 @@ export class RESTClient extends EventEmitter {
    * @param {AbortSignal} [signal]
    * @returns {Promise<Object|null>}
    */
-  async fetchQuote(ticker, signal) {
+  async fetchQuote(ticker, signal, options = {}) {
     if (!this.isAvailable()) {
       log.debug(`REST unavailable for ${ticker}`);
       return null;
@@ -121,11 +121,35 @@ export class RESTClient extends EventEmitter {
       };
 
     } catch (error) {
+      if (options.strict) {
+        throw error;
+      }
       if (error.name !== 'AbortError') {
         log.warn(`Failed to fetch quote for ${ticker}:`, error.message);
       }
       return null;
     }
+  }
+
+  /**
+   * Search for tickers by symbol or company name
+   * @param {string} query
+   * @param {AbortSignal} [signal]
+   * @returns {Promise<Array>}
+   */
+  async searchSymbols(query, signal) {
+    if (!this.isAvailable()) {
+      throw new Error('REST unavailable for search');
+    }
+
+    const trimmed = query?.trim();
+    if (!trimmed || trimmed.length < 2) {
+      return [];
+    }
+
+    const endpoint = `/search?q=${encodeURIComponent(trimmed)}`;
+    const data = await this._request(endpoint, signal);
+    return Array.isArray(data?.result) ? data.result : [];
   }
 
   /**
@@ -250,6 +274,23 @@ export class RESTClient extends EventEmitter {
       if (response.status === 429) {
         this._handleRateLimit();
         throw new Error('Rate limited (429)');
+      }
+
+      // Handle worker-origin restrictions before generic auth handler
+      if (response.status === 403 && this.useProxy) {
+        let payload = null;
+        try {
+          payload = await response.clone().json();
+        } catch {
+          // Ignore JSON parse failure, fallback to generic error
+        }
+
+        if (payload?.error === 'Forbidden origin') {
+          const originError = new Error('Origin not allowed by proxy');
+          originError.code = 'FORBIDDEN_ORIGIN';
+          this.emit('error', originError);
+          throw originError;
+        }
       }
 
       // Handle authentication errors

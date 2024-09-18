@@ -42,8 +42,166 @@ logger.setLevel(CONFIG.LOG_LEVEL);
 // Asset Data
 // ============================================================================
 
+const CUSTOM_ASSET_STORAGE_KEY = "heatmap_custom_assets_v1";
+const MIN_SEARCH_QUERY_LENGTH = 2;
+
+function loadCustomAssetMetadata() {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(CUSTOM_ASSET_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return parsed.map((item) => ({
+        ticker: item.ticker?.toUpperCase(),
+        name: item.name,
+        sector: item.sector,
+        type: item.type,
+        region: item.region,
+        currency: item.currency,
+        simulationPrice: item.simulationPrice,
+        simulationBasePrice: item.simulationBasePrice,
+        lastKnownPrice: item.lastKnownPrice,
+        addedAt: item.addedAt,
+      })).filter((item) => item.ticker);
+    }
+  } catch (error) {
+    console.warn("Failed to parse custom asset storage", error);
+  }
+  return [];
+}
+
+let customAssetMetadata = loadCustomAssetMetadata();
+
+function isCustomTicker(ticker) {
+  if (!ticker) return false;
+  const normalized = ticker.toUpperCase();
+  return customAssetMetadata.some((meta) => meta.ticker === normalized);
+}
+
+function updateCustomAssetMeta(ticker, changesOrUpdater) {
+  if (!ticker) return;
+  const normalized = ticker.toUpperCase();
+  const index = customAssetMetadata.findIndex((meta) => meta.ticker === normalized);
+  if (index === -1) return;
+
+  const draft = { ...customAssetMetadata[index] };
+  const result =
+    typeof changesOrUpdater === "function"
+      ? changesOrUpdater(draft) || draft
+      : Object.assign(draft, changesOrUpdater || {});
+
+  customAssetMetadata[index] = result;
+  persistCustomAssets();
+}
+
+function syncCustomAssetFromTile(ticker) {
+  if (!ticker || !app) return;
+  const tile = app.state.getTile(ticker);
+  if (!tile || tile.price == null) return;
+
+  updateCustomAssetMeta(ticker, (draft) => {
+    draft.lastKnownPrice = tile.price;
+    draft.simulationPrice = tile.price;
+    draft.simulationBasePrice =
+      tile.basePrice ??
+      tile.previousClose ??
+      tile._placeholderBasePrice ??
+      tile.price ??
+      draft.simulationBasePrice;
+    draft.addedAt = Date.now();
+    return draft;
+  });
+}
+
+function persistCustomAssets() {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(
+      CUSTOM_ASSET_STORAGE_KEY,
+      JSON.stringify(customAssetMetadata),
+    );
+  } catch (error) {
+    console.warn("Unable to persist custom assets", error);
+  }
+}
+
+function generateSimulationPrice(seed = Date.now()) {
+  const base = (seed % 200) + 50 + Math.random() * 25;
+  return Number(base.toFixed(2));
+}
+
+function mapMetaToAsset(meta, mode) {
+  const ticker = meta.ticker?.toUpperCase();
+  if (!ticker) return null;
+  const baseName = meta.name || ticker;
+  const baseSector = meta.sector || meta.type || "Custom";
+
+  if (mode === "simulation") {
+    const simPrice =
+      Number(meta.simulationPrice) || generateSimulationPrice(meta.addedAt);
+    const simBase =
+      Number(meta.simulationBasePrice ?? simPrice) || simPrice;
+
+    return {
+      ticker,
+      name: baseName,
+      sector: baseSector,
+      price: simPrice,
+      basePrice: simBase,
+      change: 0,
+    };
+  }
+
+  const lastKnown = Number(meta.lastKnownPrice) || 0;
+  return {
+    ticker,
+    name: baseName,
+    sector: baseSector,
+    price: lastKnown,
+    basePrice: lastKnown,
+    change: 0,
+  };
+}
+
+function mergeAssets(base, extras) {
+  const seen = new Set();
+  const merged = [];
+
+  base.forEach((asset) => {
+    const ticker = asset.ticker?.toUpperCase();
+    if (!ticker || seen.has(ticker)) return;
+    seen.add(ticker);
+    merged.push({ ...asset, ticker });
+  });
+
+  extras.forEach((asset) => {
+    const ticker = asset?.ticker?.toUpperCase();
+    if (!ticker || seen.has(ticker)) return;
+    seen.add(ticker);
+    merged.push({ ...asset, ticker });
+  });
+
+  return merged;
+}
+
+function composeAssetsForMode(mode) {
+  const base = mode === "real" ? REAL_DATA_ASSETS : SIMULATION_ASSETS;
+  const customAssets = customAssetMetadata
+    .map((meta) => mapMetaToAsset(meta, mode))
+    .filter(Boolean);
+  return mergeAssets(base, customAssets);
+}
+
+function syncAssetsSnapshot(mode) {
+  const computed = composeAssetsForMode(mode);
+  assets = computed;
+  controlPanelView?.setAssets(computed);
+  return computed;
+}
+
 // Start with simulation assets as default
-let assets = [...SIMULATION_ASSETS];
+let assets = composeAssetsForMode("simulation");
 
 const priceFormatter = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -109,6 +267,9 @@ const addTickerForm = document.getElementById("add-ticker-form");
 const addTickerInput = document.getElementById("add-ticker-input");
 const addTickerResults = document.getElementById("add-ticker-results");
 
+let lastTickerResults = new Map();
+let lastTickerQuery = "";
+
 function openAddTickerModal() {
   if (!addTickerModal) return;
   addTickerModal.classList.add("active");
@@ -138,15 +299,25 @@ if (addTickerModal) {
 if (addTickerForm) {
   addTickerForm.addEventListener("submit", (event) => {
     event.preventDefault();
-    const query = addTickerInput?.value.trim();
-    if (!query) {
-      if (addTickerResults)
+    const query = addTickerInput?.value.trim() || "";
+    if (query.length < MIN_SEARCH_QUERY_LENGTH) {
+      if (addTickerResults) {
         addTickerResults.textContent =
-          "Please type a query to search for symbols.";
+          "Type at least two characters to search for tickers.";
+      }
       return;
     }
-    if (addTickerResults) {
-      addTickerResults.textContent = `Ready to search Finnhub for "${query}" (Symbol Lookup).`;
+    performTickerLookup(query);
+  });
+}
+
+if (addTickerResults) {
+  addTickerResults.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-ticker-action]");
+    if (!button) return;
+    const symbol = button.getAttribute("data-symbol");
+    if (symbol) {
+      handleAddTickerSelection(symbol);
     }
   });
 }
@@ -156,6 +327,212 @@ document.addEventListener("keydown", (event) => {
     closeAddTickerModal();
   }
 });
+
+function escapeHtml(value) {
+  if (!value) return "";
+  return value.replace(/[&<>"']/g, (match) => {
+    switch (match) {
+      case "&":
+        return "&amp;";
+      case "<":
+        return "&lt;";
+      case ">":
+        return "&gt;";
+      case '"':
+        return "&quot;";
+      case "'":
+        return "&#39;";
+      default:
+        return match;
+    }
+  });
+}
+
+function tickerAlreadyExists(symbol) {
+  const normalized = symbol?.toUpperCase();
+  if (!normalized) return false;
+  const currentAssets = app?.assets || assets || [];
+  return currentAssets.some((asset) => asset.ticker === normalized);
+}
+
+function inferSectorFromResult(result) {
+  const type = result?.type?.toLowerCase() || "";
+  if (!type) return "Custom";
+  if (type.includes("etf")) return "ETF";
+  if (type.includes("fund")) return "Fund";
+  if (type.includes("crypto")) return "Crypto";
+  if (type.includes("forex") || type.includes("fx")) return "FX";
+  if (type.includes("index")) return "Index";
+  return "Equity";
+}
+
+function buildCustomMetaFromResult(result) {
+  const ticker = result.symbol?.toUpperCase();
+  const placeholderPrice = generateSimulationPrice(result.symbol?.length || Date.now());
+  return {
+    ticker,
+    name: result.description?.trim() || result.displaySymbol || ticker,
+    sector: inferSectorFromResult(result),
+    type: result.type || "",
+    region: result.region || "",
+    currency: result.currency || "USD",
+    simulationPrice: placeholderPrice,
+    simulationBasePrice: placeholderPrice,
+    lastKnownPrice: 0,
+    addedAt: Date.now(),
+  };
+}
+
+async function performTickerLookup(query) {
+  if (!addTickerResults) return;
+  if (!app) {
+    addTickerResults.textContent = "Heatmap is still initializing. Please try again in a moment.";
+    return;
+  }
+
+  lastTickerResults = new Map();
+  lastTickerQuery = query;
+
+  addTickerResults.innerHTML = `<p>Searching Finnhub for "<strong>${escapeHtml(query)}</strong>"...</p>`;
+
+  try {
+    const matches = await app.searchSymbols(query);
+    matches
+      .filter((item) => item?.symbol)
+      .forEach((item) => {
+        lastTickerResults.set(item.symbol.toUpperCase(), item);
+      });
+
+    renderTickerSearchResults(matches, query);
+  } catch (error) {
+    console.error("Ticker lookup failed", error);
+    addTickerResults.textContent = "Unable to fetch tickers from Finnhub. Please verify your proxy Worker and try again.";
+  }
+}
+
+function renderTickerSearchResults(results, query) {
+  if (!addTickerResults) return;
+  if (!Array.isArray(results) || results.length === 0) {
+    addTickerResults.innerHTML = `<p>No results for "<strong>${escapeHtml(query)}</strong>". Try a different symbol or company name.</p>`;
+    return;
+  }
+
+  const limited = results.slice(0, 15);
+  const rows = limited
+    .map((result) => {
+      const ticker = result.symbol?.toUpperCase() || "—";
+      const description = result.description?.trim() || result.displaySymbol || "Unknown company";
+      const metaParts = [
+        result.type,
+        result.region || result.currency,
+        result.mic,
+      ].filter(Boolean);
+      const subtitle = metaParts.join(" • ");
+      const alreadyAdded = tickerAlreadyExists(ticker);
+
+      return `
+        <li class="add-ticker-result">
+          <div class="add-ticker-meta">
+            <div class="add-ticker-result-title">${escapeHtml(ticker)}</div>
+            <div class="add-ticker-result-subtitle">${escapeHtml(description)}</div>
+            ${
+              subtitle
+                ? `<div class="add-ticker-result-tags">${escapeHtml(subtitle)}</div>`
+                : ""
+            }
+          </div>
+          <button
+            type="button"
+            class="add-ticker-result-action"
+            data-ticker-action="add"
+            data-symbol="${escapeHtml(ticker)}"
+            ${alreadyAdded ? "disabled" : ""}
+          >
+            ${alreadyAdded ? "Added" : "Add"}
+          </button>
+        </li>
+      `;
+    })
+    .join("");
+
+  addTickerResults.innerHTML = `
+    <p class="add-ticker-results-intro">
+      Showing ${limited.length} result${limited.length === 1 ? "" : "s"} for "<strong>${escapeHtml(query)}</strong>"
+    </p>
+    <ul class="add-ticker-result-list">
+      ${rows}
+    </ul>
+  `;
+}
+
+function handleAddTickerSelection(symbol) {
+  const normalized = symbol?.toUpperCase();
+  if (!normalized) return;
+
+  if (!app) {
+    showToast("Heatmap is still initializing. Please try again.");
+    return;
+  }
+
+  if (tickerAlreadyExists(normalized)) {
+    showToast(`${normalized} is already on the heatmap`);
+    renderTickerSearchResults(Array.from(lastTickerResults.values()), lastTickerQuery);
+    return;
+  }
+
+  const match = lastTickerResults.get(normalized);
+  if (!match) {
+    showToast("Unable to resolve ticker details. Search again.");
+    return;
+  }
+
+  const meta = buildCustomMetaFromResult(match);
+  customAssetMetadata = customAssetMetadata.filter((item) => item.ticker !== normalized);
+  customAssetMetadata.push(meta);
+  persistCustomAssets();
+
+  const mode = app?.state.getMode() || "simulation";
+  const updatedAssets = syncAssetsSnapshot(mode);
+  app?.applyExternalAssets(updatedAssets, {
+    mode,
+    toastMessage: `${normalized} added to the heatmap`,
+  });
+  controlPanelView?.scheduleStatsUpdate();
+
+  if (mode === "real") {
+    primeCustomTicker(normalized);
+  }
+
+  renderTickerSearchResults(Array.from(lastTickerResults.values()), lastTickerQuery);
+}
+
+async function primeCustomTicker(ticker) {
+  if (!app) return;
+  try {
+    const quote = await app.fetchQuoteDirect(ticker);
+    if (!quote) {
+      showToast(`No live data for ${ticker}`);
+      return;
+    }
+
+    updateCustomAssetMeta(ticker, (draft) => {
+      draft.lastKnownPrice = quote.price;
+      draft.simulationPrice = quote.price;
+      draft.simulationBasePrice = quote.previousClose ?? quote.price ?? draft.simulationBasePrice;
+      draft.addedAt = Date.now();
+      return draft;
+    });
+
+    app.state.updateTile(ticker, quote);
+    app.paintTile(ticker);
+  } catch (error) {
+    if (error?.code === "AUTH_FAILED" || error?.code === "INVALID_API_KEY") {
+      showToast("Custom tickers require a valid Finnhub API key.");
+    } else {
+      showToast(`Unable to fetch ${ticker}. Please try again later.`);
+    }
+  }
+}
 
 // ============================================================================
 // Global App Instance
@@ -195,6 +572,7 @@ function initHeatmap() {
   heatmapView.buildHeatmap(heatmapContainer);
 
   app = new AppController(assets);
+  app.setAssetsResolver((mode) => composeAssetsForMode(mode));
   app.init();
 
   modalView.setApp(app);
@@ -218,17 +596,25 @@ function initHeatmap() {
   controlPanelView = new ControlPanelView(app, assets, controlHelpers);
   controlPanelView.init();
   controlPanelView.updateStats();
+  controlPanelView.setAssets(getRuntimeAssets());
 
   // Handle single tile updates (Real Data mode)
-  app.state.on("tile:updated", () => {
+  app.state.on("tile:updated", (payload = {}) => {
     controlPanelView.scheduleStatsUpdate();
     modalView.updateModalIfOpen();
+    if (payload?.ticker && isCustomTicker(payload.ticker)) {
+      syncCustomAssetFromTile(payload.ticker);
+    }
   });
 
   // Handle batch tile updates (Simulation mode - optimized)
   app.state.on("tiles:batch_updated", () => {
     controlPanelView.scheduleStatsUpdate();
     modalView.updateModalIfOpen();
+  });
+
+  app.state.on("mode:changed", ({ mode }) => {
+    syncAssetsSnapshot(mode);
   });
 
   log.info("Heatmap initialized successfully");
@@ -289,6 +675,10 @@ function updateModalIfOpen() {
 // Control Functions
 // ============================================================================
 
+function getRuntimeAssets() {
+  return app?.assets || assets;
+}
+
 function toggleAnimation() {
   const mode = app.state.getMode();
 
@@ -309,7 +699,7 @@ function toggleAnimation() {
 }
 
 function simulateMarketCrash() {
-  assets.forEach((asset) => {
+  getRuntimeAssets().forEach((asset) => {
     const tile = app.state.getTile(asset.ticker);
     if (tile) {
       // Ensure we have a base price (use placeholder for simulation)
@@ -326,7 +716,7 @@ function simulateMarketCrash() {
 }
 
 function simulateBullRun() {
-  assets.forEach((asset) => {
+  getRuntimeAssets().forEach((asset) => {
     const tile = app.state.getTile(asset.ticker);
     if (tile) {
       // Ensure we have a base price (use placeholder for simulation)
@@ -343,7 +733,7 @@ function simulateBullRun() {
 }
 
 function resetMarket() {
-  assets.forEach((asset) => {
+  getRuntimeAssets().forEach((asset) => {
     const tile = app.state.getTile(asset.ticker);
     if (tile) {
       // Ensure we have a base price (use placeholder for simulation)
@@ -361,7 +751,7 @@ function resetMarket() {
 
 function exportToCSV() {
   const headers = ["Ticker", "Name", "Sector", "Price", "Change %"];
-  const rows = assets.map((a) => {
+  const rows = getRuntimeAssets().map((a) => {
     const tile = app.state.getTile(a.ticker);
     return [
       a.ticker,
