@@ -81,7 +81,7 @@ export class RESTClient extends EventEmitter {
     const endpoint = `/quote?symbol=${encodeURIComponent(ticker)}`;
 
     try {
-      const data = await this._request(endpoint, signal);
+      const data = await this._request(endpoint, signal, options);
 
       if (!data || typeof data.c !== 'number') {
         return null;
@@ -109,6 +109,13 @@ export class RESTClient extends EventEmitter {
         }
       }
 
+      // Normalize timestamp: Finnhub returns seconds; fall back to now if missing
+      const rawTs = Number(data.t ?? data.timestamp ?? data.T ?? 0);
+      const timestamp =
+        Number.isFinite(rawTs) && rawTs > 0
+          ? (rawTs < 2_000_000_000 ? rawTs * 1000 : rawTs)
+          : Date.now();
+
       return {
         ticker,
         price: data.c,
@@ -117,7 +124,7 @@ export class RESTClient extends EventEmitter {
         high: data.h,
         low: data.l,
         open: data.o,
-        timestamp: Date.now()
+        timestamp
       };
 
     } catch (error) {
@@ -134,10 +141,12 @@ export class RESTClient extends EventEmitter {
   /**
    * Search for tickers by symbol or company name
    * @param {string} query
-   * @param {AbortSignal} [signal]
+   * @param {Object} [options]
+   * @param {AbortSignal} [options.signal]
    * @returns {Promise<Array>}
    */
-  async searchSymbols(query, signal) {
+  async searchSymbols(query, options = {}) {
+    const { signal } = options;
     if (!this.isAvailable()) {
       throw new Error('REST unavailable for search');
     }
@@ -148,7 +157,7 @@ export class RESTClient extends EventEmitter {
     }
 
     const endpoint = `/search?q=${encodeURIComponent(trimmed)}`;
-    const data = await this._request(endpoint, signal);
+    const data = await this._request(endpoint, signal, options);
     return Array.isArray(data?.result) ? data.result : [];
   }
 
@@ -158,7 +167,7 @@ export class RESTClient extends EventEmitter {
    * @param {AbortSignal} [signal]
    * @returns {Promise<Object|null>}
    */
-  async fetchMarketStatus(exchange, signal) {
+  async fetchMarketStatus(exchange, signal, options = {}) {
     if (!this.isAvailable()) {
       log.debug(`REST unavailable for market status ${exchange}`);
       return null;
@@ -167,7 +176,7 @@ export class RESTClient extends EventEmitter {
     const endpoint = `/stock/market-status?exchange=${encodeURIComponent(exchange)}`;
     
     try {
-      const data = await this._request(endpoint, signal);
+      const data = await this._request(endpoint, signal, options);
       
       if (!data) return null;
 
@@ -246,7 +255,8 @@ export class RESTClient extends EventEmitter {
    * Make HTTP request with rate limiting and error handling
    * @private
    */
-  async _request(endpoint, signal) {
+  async _request(endpoint, signal, requestOptions = {}) {
+    const { suppressAuthErrors = false } = requestOptions;
     // Check rate limit
     await this._checkRateLimit();
 
@@ -297,8 +307,13 @@ export class RESTClient extends EventEmitter {
       if (response.status === 401 || response.status === 403) {
         const error = new Error(`Authentication failed (${response.status})`);
         error.code = 'AUTH_FAILED';
-        this.emit('error', error);
-        throw error;
+        if (!suppressAuthErrors) {
+          this.emit('error', error);
+          throw error;
+        }
+        // In suppress mode, swallow auth failures for per-ticker calls
+        log.warn(`Auth failure suppressed for request ${endpoint}`);
+        return null;
       }
 
       if (!response.ok) {
@@ -361,13 +376,14 @@ export class RESTClient extends EventEmitter {
    * @private
    */
   _handleRateLimit() {
-    // First 429: wait configured amount
-    if (this.backoffDelay === 0) {
-      this.backoffDelay = CONFIG.FINNHUB.RATE_LIMIT.BACKOFF_429;
-    } else {
-      // Double the backoff (exponential), max 5 minutes
-      this.backoffDelay = Math.min(this.backoffDelay * 2, 300000);
-    }
+    // Linear backoff: start at configured cooldown, add 30s per hit, cap at 2 minutes
+    const initial = CONFIG.FINNHUB.RATE_LIMIT.BACKOFF_429;
+    const increment = 30000; // 30s
+    const maxDelay = 120000; // 2 minutes
+
+    this.backoffDelay = this.backoffDelay === 0
+      ? initial
+      : Math.min(this.backoffDelay + increment, maxDelay);
 
     this.backoffUntil = Date.now() + this.backoffDelay;
 

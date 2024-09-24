@@ -94,6 +94,74 @@ export class StateManager extends EventEmitter {
   }
 
   /**
+   * Reconcile tiles with a new asset list without discarding existing data
+   * @param {Array} assets
+   * @param {Object} options
+   * @param {boolean} [options.preserveExistingData=false] - Keep existing quote data for overlapping tickers
+   * @param {'simulation' | 'real'} [options.mode] - Mode to initialize placeholders for new tickers
+   */
+  reconcileTiles(assets, options = {}) {
+    const { preserveExistingData = false, mode } = options;
+    const targetMode = mode || this.state.mode || 'simulation';
+
+    const existing = new Map(this.state.tiles);
+    this.state.tiles.clear();
+
+    assets.forEach((asset) => {
+      if (!asset || !asset.ticker) return;
+
+      const ticker = asset.ticker;
+      const placeholderPrice =
+        asset.price ?? asset.basePrice ?? asset._placeholderPrice ?? 0;
+      const placeholderBase =
+        asset.basePrice ?? asset.price ?? asset._placeholderBasePrice ?? null;
+
+      const existingTile = existing.get(ticker);
+      if (existingTile && preserveExistingData) {
+        const merged = {
+          ...existingTile,
+          ticker,
+          name: asset.name,
+          sector: asset.sector,
+          _placeholderPrice: placeholderPrice,
+          _placeholderBasePrice: placeholderBase,
+          dirty: true,
+        };
+        this.state.tiles.set(ticker, merged);
+        return;
+      }
+
+      const isSimulation = targetMode === 'simulation';
+      const basePrice = placeholderBase;
+      const initialPrice = isSimulation ? placeholderPrice : null;
+      const initialBase = isSimulation ? basePrice : null;
+      const initialChange =
+        isSimulation && asset.change != null ? asset.change : isSimulation ? 0 : null;
+
+      this.state.tiles.set(ticker, {
+        ticker,
+        name: asset.name,
+        sector: asset.sector,
+        _placeholderPrice: placeholderPrice,
+        _placeholderBasePrice: basePrice,
+        price: initialPrice,
+        basePrice: initialBase,
+        change: initialChange,
+        previousClose: isSimulation ? basePrice : null,
+        open: isSimulation ? placeholderPrice : null,
+        high: isSimulation ? placeholderPrice : null,
+        low: isSimulation ? placeholderPrice : null,
+        volume: isSimulation ? 0 : null,
+        hasInfo: isSimulation && initialPrice != null,
+        lastTradeTs: 0,
+        dirty: true
+      });
+    });
+
+    this.emit('tiles:reinitialized', { count: this.state.tiles.size });
+  }
+
+  /**
    * Get current mode
    * @returns {'simulation' | 'real'}
    */

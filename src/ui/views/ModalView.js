@@ -30,12 +30,28 @@ export class ModalView {
         if (event.target === modal) {
           this.closeModal();
         }
+
+        // Handle remove button clicks (for dynamically added button)
+        if (event.target.id === "modal-remove-btn-inline") {
+          this.handleRemoveTicker();
+        }
       });
     }
 
     const modalClose = document.getElementById("modal-close-btn");
     if (modalClose) {
       modalClose.addEventListener("click", () => this.closeModal());
+    }
+  }
+
+  handleRemoveTicker() {
+    if (this.currentModalAssetIndex === null) return;
+    const asset = this.assets[this.currentModalAssetIndex];
+    if (!asset) return;
+
+    if (this.helpers.removeTicker) {
+      this.helpers.removeTicker(asset.ticker);
+      this.closeModal();
     }
   }
 
@@ -46,6 +62,16 @@ export class ModalView {
     const tileState = this.app.state.getTile(asset.ticker);
     const history = this.app.priceHistory.get(asset.ticker) || [];
     const mode = this.app.state.getMode();
+
+    // Update modal header with ticker and company name
+    const modalTicker = document.getElementById("modal-ticker");
+    const modalName = document.getElementById("modal-name");
+    if (modalTicker) {
+      modalTicker.textContent = asset.ticker;
+    }
+    if (modalName) {
+      modalName.textContent = asset.name || "";
+    }
 
     const detailRows = [];
     const addRow = (label, value, options = {}) => {
@@ -135,7 +161,19 @@ export class ModalView {
     addRow("Volume", this.helpers.formatVolume(volumeValue));
     addRow("Last Trade", lastTradeLabel);
 
-    document.getElementById("modal-details").innerHTML = detailRows.join("");
+    // Remove button (always visible, handler will check if removal is allowed)
+    const removeButtonHtml = `
+      <div style="grid-column: 1 / -1; margin-bottom: 16px; display: flex; justify-content: flex-start;">
+        <button class="modal-remove-btn" id="modal-remove-btn-inline" type="button" data-ticker="${asset.ticker}">
+          Remove Ticker
+        </button>
+      </div>
+    `;
+
+    const modalDetails = document.getElementById("modal-details");
+    if (modalDetails) {
+      modalDetails.innerHTML = removeButtonHtml + detailRows.join("");
+    }
 
     const chartRange = document.getElementById("chart-time-range");
     if (chartRange) {

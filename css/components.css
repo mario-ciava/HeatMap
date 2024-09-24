@@ -132,6 +132,10 @@
   transform: rotate(90deg);
 }
 
+.modal-header {
+  margin-bottom: 24px;
+}
+
 .modal-ticker {
   font-size: 2.2rem;
   font-weight: 700;
@@ -146,8 +150,49 @@
 .modal-name {
   color: var(--text-secondary);
   font-size: 1.05rem;
-  margin-bottom: 24px;
+  margin-bottom: 0;
   font-weight: 400;
+}
+
+.modal-remove-btn {
+  padding: 12px 24px;
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.12) 0%, rgba(220, 38, 38, 0.08) 100%);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: 12px;
+  color: #ef4444;
+  cursor: pointer;
+  transition: all 0.3s var(--ease-standard);
+  font-size: 0.92rem;
+  font-weight: 700;
+  letter-spacing: var(--letter-spacing-compact);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow:
+    0 4px 12px rgba(239, 68, 68, 0.15),
+    0 0 0 1px rgba(239, 68, 68, 0.1) inset;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.modal-remove-btn::before {
+  content: "🗑️";
+  font-size: 1rem;
+}
+
+.modal-remove-btn:hover {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(220, 38, 38, 0.15) 100%);
+  border-color: rgba(239, 68, 68, 0.5);
+  transform: translateY(-2px);
+  box-shadow:
+    0 8px 20px rgba(239, 68, 68, 0.3),
+    0 0 0 1px rgba(239, 68, 68, 0.2) inset;
+}
+
+.modal-remove-btn:active {
+  transform: translateY(0);
+  box-shadow:
+    0 2px 8px rgba(239, 68, 68, 0.2),
+    0 0 0 1px rgba(239, 68, 68, 0.15) inset;
 }
 
 .modal-details {

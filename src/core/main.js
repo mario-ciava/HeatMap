@@ -4,7 +4,7 @@
  */
 
 import { AppController } from "../services/AppController.js";
-import { CONFIG, SIMULATION_ASSETS, REAL_DATA_ASSETS } from "../config.js";
+import { CONFIG, SIMULATION_ASSETS, REAL_DATA_ASSETS, MAX_TOTAL_TICKERS } from "../config.js";
 import { logger } from "../utils/Logger.js";
 import { perfMonitor, perfReport } from "../utils/PerfMonitor.js";
 import { ControlPanelView } from '../ui/views/ControlPanelView.js';
@@ -43,6 +43,7 @@ logger.setLevel(CONFIG.LOG_LEVEL);
 // ============================================================================
 
 const CUSTOM_ASSET_STORAGE_KEY = "heatmap_custom_assets_v1";
+const BLACKLIST_STORAGE_KEY = "heatmap_blacklist_tickers_v1";
 const MIN_SEARCH_QUERY_LENGTH = 2;
 
 function loadCustomAssetMetadata() {
@@ -72,6 +73,38 @@ function loadCustomAssetMetadata() {
 }
 
 let customAssetMetadata = loadCustomAssetMetadata();
+let tickerBlacklist = loadBlacklist();
+
+// Blacklist management for removed tickers
+function loadBlacklist() {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(BLACKLIST_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.map((t) => t.toUpperCase()) : [];
+  } catch (error) {
+    console.warn("Failed to parse blacklist", error);
+  }
+  return [];
+}
+
+function saveBlacklist(next) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(BLACKLIST_STORAGE_KEY, JSON.stringify(next));
+  } catch (error) {
+    console.error("Failed to save blacklist", error);
+  }
+}
+
+function unblacklistTicker(ticker) {
+  if (!ticker) return;
+  const normalized = ticker.toUpperCase();
+  if (!tickerBlacklist.includes(normalized)) return;
+  tickerBlacklist = tickerBlacklist.filter((t) => t !== normalized);
+  saveBlacklist(tickerBlacklist);
+}
 
 function isCustomTicker(ticker) {
   if (!ticker) return false;
@@ -190,7 +223,10 @@ function composeAssetsForMode(mode) {
   const customAssets = customAssetMetadata
     .map((meta) => mapMetaToAsset(meta, mode))
     .filter(Boolean);
-  return mergeAssets(base, customAssets);
+  const merged = mergeAssets(base, customAssets);
+  return merged.filter(
+    (asset) => !tickerBlacklist.includes(asset.ticker.toUpperCase()),
+  );
 }
 
 function syncAssetsSnapshot(mode) {
@@ -269,6 +305,8 @@ const addTickerResults = document.getElementById("add-ticker-results");
 
 let lastTickerResults = new Map();
 let lastTickerQuery = "";
+let tickerLookupAbortController = null;
+let tickerLookupRequestId = 0;
 
 function openAddTickerModal() {
   if (!addTickerModal) return;
@@ -390,23 +428,66 @@ async function performTickerLookup(query) {
     return;
   }
 
-  lastTickerResults = new Map();
-  lastTickerQuery = query;
+  const normalizedQuery = query?.trim() || "";
+  if (normalizedQuery.length < MIN_SEARCH_QUERY_LENGTH) {
+    addTickerResults.textContent =
+      "Type at least two characters to search for tickers.";
+    return;
+  }
 
-  addTickerResults.innerHTML = `<p>Searching Finnhub for "<strong>${escapeHtml(query)}</strong>"...</p>`;
+  const requestId = ++tickerLookupRequestId;
+
+  if (tickerLookupAbortController) {
+    tickerLookupAbortController.abort();
+  }
+  const controller = new AbortController();
+  tickerLookupAbortController = controller;
+  const { signal } = controller;
+
+  addTickerResults.innerHTML = `<p>Searching Finnhub for "<strong>${escapeHtml(normalizedQuery)}</strong>"...</p>`;
 
   try {
-    const matches = await app.searchSymbols(query);
+    const matches = await app.searchSymbols(normalizedQuery, {
+      signal,
+      suppressAuthErrors: true,
+    });
+
+    if (signal.aborted || requestId !== tickerLookupRequestId) {
+      return;
+    }
+
+    const nextResults = new Map();
     matches
       .filter((item) => item?.symbol)
       .forEach((item) => {
-        lastTickerResults.set(item.symbol.toUpperCase(), item);
+        nextResults.set(item.symbol.toUpperCase(), item);
       });
 
-    renderTickerSearchResults(matches, query);
+    lastTickerResults = nextResults;
+    lastTickerQuery = normalizedQuery;
+
+    renderTickerSearchResults(matches, normalizedQuery);
   } catch (error) {
+    if (signal.aborted || requestId !== tickerLookupRequestId) {
+      return;
+    }
     console.error("Ticker lookup failed", error);
-    addTickerResults.textContent = "Unable to fetch tickers from Finnhub. Please verify your proxy Worker and try again.";
+
+    // Fallback: allow manual entry even if Finnhub search is unavailable
+    const manualResult = {
+      symbol: normalizedQuery.toUpperCase(),
+      description: "Manual entry (not validated)",
+      type: "custom",
+      region: "",
+      currency: "USD",
+    };
+    lastTickerResults = new Map([[manualResult.symbol, manualResult]]);
+    lastTickerQuery = normalizedQuery;
+    renderTickerSearchResults([manualResult], normalizedQuery);
+  } finally {
+    if (tickerLookupAbortController === controller) {
+      tickerLookupAbortController = null;
+    }
   }
 }
 
@@ -480,6 +561,13 @@ function handleAddTickerSelection(symbol) {
     return;
   }
 
+  // Check if we've reached the maximum ticker limit
+  const currentAssets = app?.assets || assets || [];
+  if (currentAssets.length >= MAX_TOTAL_TICKERS) {
+    showToast(`Maximum ${MAX_TOTAL_TICKERS} tickers allowed. Remove a ticker to add a new one.`);
+    return;
+  }
+
   const match = lastTickerResults.get(normalized);
   if (!match) {
     showToast("Unable to resolve ticker details. Search again.");
@@ -487,6 +575,7 @@ function handleAddTickerSelection(symbol) {
   }
 
   const meta = buildCustomMetaFromResult(match);
+  unblacklistTicker(normalized);
   customAssetMetadata = customAssetMetadata.filter((item) => item.ticker !== normalized);
   customAssetMetadata.push(meta);
   persistCustomAssets();
@@ -499,39 +588,40 @@ function handleAddTickerSelection(symbol) {
   });
   controlPanelView?.scheduleStatsUpdate();
 
-  if (mode === "real") {
-    primeCustomTicker(normalized);
-  }
+  // Don't fetch immediately in real mode - let the normal WebSocket/REST flow handle it
+  // This avoids rate limiting issues and respects the sequential fetch queue
 
   renderTickerSearchResults(Array.from(lastTickerResults.values()), lastTickerQuery);
 }
 
-async function primeCustomTicker(ticker) {
-  if (!app) return;
-  try {
-    const quote = await app.fetchQuoteDirect(ticker);
-    if (!quote) {
-      showToast(`No live data for ${ticker}`);
-      return;
-    }
+function removeTicker(ticker) {
+  const normalized = ticker?.toUpperCase();
+  if (!normalized) return;
 
-    updateCustomAssetMeta(ticker, (draft) => {
-      draft.lastKnownPrice = quote.price;
-      draft.simulationPrice = quote.price;
-      draft.simulationBasePrice = quote.previousClose ?? quote.price ?? draft.simulationBasePrice;
-      draft.addedAt = Date.now();
-      return draft;
-    });
-
-    app.state.updateTile(ticker, quote);
-    app.paintTile(ticker);
-  } catch (error) {
-    if (error?.code === "AUTH_FAILED" || error?.code === "INVALID_API_KEY") {
-      showToast("Custom tickers require a valid Finnhub API key.");
-    } else {
-      showToast(`Unable to fetch ${ticker}. Please try again later.`);
-    }
+  if (!app) {
+    showToast("Heatmap is still initializing. Please try again.");
+    return;
   }
+
+  // Add to blacklist to hide default tickers too
+  if (!tickerBlacklist.includes(normalized)) {
+    tickerBlacklist.push(normalized);
+    saveBlacklist(tickerBlacklist);
+  }
+
+  // If it's a custom ticker, also remove from custom metadata
+  if (isCustomTicker(normalized)) {
+    customAssetMetadata = customAssetMetadata.filter((item) => item.ticker !== normalized);
+    persistCustomAssets();
+  }
+
+  const mode = app?.state.getMode() || "simulation";
+  const updatedAssets = syncAssetsSnapshot(mode);
+  app?.applyExternalAssets(updatedAssets, {
+    mode,
+    toastMessage: `${normalized} removed from the heatmap`,
+  });
+  controlPanelView?.scheduleStatsUpdate();
 }
 
 // ============================================================================
@@ -563,6 +653,7 @@ function initHeatmap() {
     formatPercent,
     formatVolume,
     formatRelativeTime,
+    removeTicker,
   });
   modalView.init();
 

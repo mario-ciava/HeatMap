@@ -235,8 +235,9 @@ export function getActiveExchanges(tickers) {
 // ============================================================================
 
 /**
- * Real Data Assets - Used when in Real Data mode (50 assets)
+ * Real Data Assets - Used when in Real Data mode (30 assets)
  * These are well-established stocks with reliable real-time data
+ * Maximum 40 tickers allowed (30 default + 10 custom)
  */
 export const REAL_DATA_ASSETS = [
   { ticker: "AAPL", name: "Apple Inc.", price: 182.52, basePrice: 182.52, change: 0, sector: "Technology" },
@@ -257,46 +258,28 @@ export const REAL_DATA_ASSETS = [
   { ticker: "NFLX", name: "Netflix", price: 481.73, basePrice: 481.73, change: 0, sector: "Entertainment" },
   { ticker: "ADBE", name: "Adobe", price: 589.27, basePrice: 589.27, change: 0, sector: "Technology" },
   { ticker: "CRM", name: "Salesforce", price: 221.49, basePrice: 221.49, change: 0, sector: "Technology" },
-  { ticker: "PFE", name: "Pfizer", price: 28.92, basePrice: 28.92, change: 0, sector: "Healthcare" },
-  { ticker: "TMO", name: "Thermo Fisher", price: 547.38, basePrice: 547.38, change: 0, sector: "Healthcare" },
   { ticker: "CSCO", name: "Cisco", price: 49.67, basePrice: 49.67, change: 0, sector: "Technology" },
   { ticker: "ORCL", name: "Oracle", price: 106.84, basePrice: 106.84, change: 0, sector: "Technology" },
-  { ticker: "INTC", name: "Intel", price: 43.65, basePrice: 43.65, change: 0, sector: "Technology" },
-  { ticker: "IBM", name: "IBM", price: 140.28, basePrice: 140.28, change: 0, sector: "Technology" },
   { ticker: "BAC", name: "Bank of America", price: 31.82, basePrice: 31.82, change: 0, sector: "Financial" },
-  { ticker: "C", name: "Citigroup", price: 45.33, basePrice: 45.33, change: 0, sector: "Financial" },
-  { ticker: "GS", name: "Goldman Sachs", price: 394.11, basePrice: 394.11, change: 0, sector: "Financial" },
-  { ticker: "MS", name: "Morgan Stanley", price: 85.27, basePrice: 85.27, change: 0, sector: "Financial" },
   { ticker: "HD", name: "Home Depot", price: 328.4, basePrice: 328.4, change: 0, sector: "Retail" },
-  { ticker: "LOW", name: "Lowe's", price: 205.55, basePrice: 205.55, change: 0, sector: "Retail" },
   { ticker: "KO", name: "Coca-Cola", price: 58.73, basePrice: 58.73, change: 0, sector: "Consumer" },
   { ticker: "PEP", name: "PepsiCo", price: 172.66, basePrice: 172.66, change: 0, sector: "Consumer" },
   { ticker: "NKE", name: "Nike", price: 97.42, basePrice: 97.42, change: 0, sector: "Consumer" },
   { ticker: "MCD", name: "McDonald's", price: 257.88, basePrice: 257.88, change: 0, sector: "Consumer" },
-  { ticker: "SBUX", name: "Starbucks", price: 88.11, basePrice: 88.11, change: 0, sector: "Consumer" },
-  { ticker: "COST", name: "Costco", price: 684.92, basePrice: 684.92, change: 0, sector: "Retail" },
-  { ticker: "T", name: "AT&T", price: 16.24, basePrice: 16.24, change: 0, sector: "Telecom" },
-  { ticker: "VZ", name: "Verizon", price: 39.77, basePrice: 39.77, change: 0, sector: "Telecom" },
   { ticker: "XOM", name: "Exxon Mobil", price: 115.6, basePrice: 115.6, change: 0, sector: "Energy" },
   { ticker: "CVX", name: "Chevron", price: 158.95, basePrice: 158.95, change: 0, sector: "Energy" },
-  { ticker: "SHEL", name: "Shell plc", price: 66.12, basePrice: 66.12, change: 0, sector: "Energy" },
   { ticker: "AMD", name: "Advanced Micro Devices", price: 117.53, basePrice: 117.53, change: 0, sector: "Technology" },
-  { ticker: "AVGO", name: "Broadcom", price: 1289.4, basePrice: 1289.4, change: 0, sector: "Technology" },
   { ticker: "QCOM", name: "Qualcomm", price: 134.22, basePrice: 134.22, change: 0, sector: "Technology" },
-  { ticker: "TXN", name: "Texas Instruments", price: 168.37, basePrice: 168.37, change: 0, sector: "Technology" },
-  { ticker: "BMY", name: "Bristol-Myers Squibb", price: 45.91, basePrice: 45.91, change: 0, sector: "Healthcare" },
-  { ticker: "ABBV", name: "AbbVie", price: 165.74, basePrice: 165.74, change: 0, sector: "Healthcare" },
-  { ticker: "MRK", name: "Merck & Co.", price: 122.18, basePrice: 122.18, change: 0, sector: "Healthcare" },
-  { ticker: "BA", name: "Boeing", price: 196.44, basePrice: 196.44, change: 0, sector: "Industrial" },
-  { ticker: "GE", name: "GE Aerospace", price: 164.3, basePrice: 164.3, change: 0, sector: "Industrial" },
 ];
 
+export const MAX_TOTAL_TICKERS = 40;
+
 /**
- * Simulation Assets - Used when in Simulation mode (100 assets)
- * Includes all Real Data assets plus 50 additional assets for richer visualization
+ * Simulation Assets - Used when in Simulation mode (80 assets)
+ * Includes all 30 Real Data assets plus 50 additional assets for richer visualization
  */
 export const SIMULATION_ASSETS = [
-  // Original 50 assets from Real Data
+  // 30 default Real Data assets
   ...REAL_DATA_ASSETS,
 
   // Additional 50 assets for simulation mode

@@ -207,11 +207,68 @@ export class FinnhubTransport extends EventEmitter {
   /**
    * Search Finnhub symbols via REST client
    * @param {string} query
+   * @param {Object} [options]
    * @returns {Promise<Array>}
    */
-  async searchSymbols(query) {
+  async searchSymbols(query, options = {}) {
     if (!this.rest) return [];
-    return this.rest.searchSymbols(query);
+    return this.rest.searchSymbols(query, options);
+  }
+
+  /**
+   * Warm up new tickers via REST without restarting transport
+   * @param {string[]} tickers
+   */
+  async warmupTickers(tickers = [], retryCount = 0) {
+    if (!Array.isArray(tickers) || tickers.length === 0) return;
+    if (!this.rest) return;
+
+    // If REST is temporarily unavailable (e.g., rate limited), retry after backoff
+    if (!this.rest.isAvailable()) {
+      const backoff = this.rest.getBackoffStatus();
+      if (backoff.inBackoff) {
+        const delay = Math.max(100, backoff.remainingMs + 100);
+        log.debug(`Warmup deferred for ${tickers.length} ticker(s) due to backoff; retrying in ${delay}ms`);
+        setTimeout(() => this.warmupTickers(tickers, retryCount), delay);
+      }
+      return;
+    }
+
+    const unique = Array.from(new Set(tickers.filter(Boolean)));
+    const toFetch = unique.filter((ticker) => {
+      const tile = this.stateManager.getTile(ticker);
+      return tile && !tile.hasInfo;
+    });
+
+    if (toFetch.length === 0) return;
+
+    log.info(`Warming up ${toFetch.length} ticker(s) via REST`);
+
+    const results = await Promise.allSettled(
+      toFetch.map((ticker) => this.rest.fetchQuote(ticker, undefined, { suppressAuthErrors: true })),
+    );
+
+    const failed = [];
+    results.forEach((result, index) => {
+      const ticker = toFetch[index];
+      if (result.status === "fulfilled" && result.value) {
+        this._handleQuote(result.value, "rest-warmup");
+      } else {
+        failed.push(ticker);
+        const reason =
+          result.status === "rejected"
+            ? result.reason?.message || "Unknown error"
+            : "No data";
+        log.warn(`Warmup failed for ${ticker}: ${reason}`);
+      }
+    });
+
+    // Retry limited times for failures (helps custom tickers after transient issues)
+    if (failed.length > 0 && retryCount < 3) {
+      const delay = 1000 * (retryCount + 1);
+      log.debug(`Retrying warmup for ${failed.length} ticker(s) in ${delay}ms`);
+      setTimeout(() => this.warmupTickers(failed, retryCount + 1), delay);
+    }
   }
 
   /**
@@ -415,6 +472,14 @@ export class FinnhubTransport extends EventEmitter {
     const BATCH_DELAY_MS = 1100; // 1.1s between batches
 
     while (this.isRunning && this.sequentialFetchQueue.length > 0) {
+      const backoff = this.rest.getBackoffStatus();
+      if (backoff.inBackoff) {
+        const waitMs = Math.max(50, backoff.remainingMs + 50);
+        log.debug(`Batch fetch paused for backoff (${Math.ceil(waitMs / 1000)}s)`);
+        await new Promise((resolve) => setTimeout(resolve, waitMs));
+        continue;
+      }
+
       // Get next batch of tickers
       const batch = [];
       for (let i = 0; i < BATCH_SIZE && this.sequentialFetchQueue.length > 0; i++) {
@@ -440,14 +505,26 @@ export class FinnhubTransport extends EventEmitter {
       );
 
       // Process results
+      const retryTickers = [];
       results.forEach((result, index) => {
         const ticker = batch[index];
         if (result.status === 'fulfilled' && result.value) {
           this._handleQuote(result.value, 'rest-batch');
         } else {
-          log.warn(`Failed to fetch ${ticker}:`, result.reason?.message || 'Unknown error');
+          const msg = result.reason?.message || 'Unknown error';
+          log.warn(`Failed to fetch ${ticker}: ${msg}`);
+
+          // Requeue if we were in backoff or got no data, to try again later
+          const backoffStatus = this.rest.getBackoffStatus();
+          if (backoffStatus.inBackoff || !result.value) {
+            retryTickers.push(ticker);
+          }
         }
       });
+
+      if (retryTickers.length > 0) {
+        this.sequentialFetchQueue.push(...retryTickers);
+      }
 
       // Wait before next batch (only if more items to process)
       if (this.sequentialFetchQueue.length > 0) {

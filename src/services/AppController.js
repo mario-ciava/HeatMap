@@ -36,6 +36,9 @@ export class AppController {
     this.fetchingCompleted = 0;
     this.fetchingJustCompleted = false;
 
+    // Rate limit cooldown interval
+    this.rateLimitInterval = null;
+
     // Wire up event handlers
     this._setupEventHandlers();
     this.tileRegistry.initializeDOMCache();
@@ -56,6 +59,7 @@ export class AppController {
     });
 
     this.assetsResolver = null;
+    this.cachedRealTiles = new Map();
 
     log.info("AppController initialized");
   }
@@ -85,6 +89,7 @@ export class AppController {
 
     // Update tile registry
     this.tileRegistry.setAssets(newAssets);
+    this._syncRendererWithRegistry();
 
     // Update views
     if (this.modalView) {
@@ -99,6 +104,7 @@ export class AppController {
       setTimeout(() => {
         this.tileRegistry.initializeDOMCache();
         this.tileController.resetPriceHistory(mode);
+        this._syncRendererWithRegistry();
 
         // Re-render all tiles with new cache
         this.paintAll();
@@ -155,10 +161,20 @@ export class AppController {
     // Track if we're switching assets (and thus rebuilding everything)
     const isSwitchingAssets = oldMode !== mode;
 
+    // If leaving real mode, snapshot current real tiles to restore later
+    if (oldMode === "real" && mode !== "real") {
+      this._snapshotRealTiles();
+    }
+
     // Switch to appropriate asset list for the mode
     if (isSwitchingAssets) {
       const newAssets = this._resolveAssetsForMode(mode);
       this.switchAssets(newAssets, mode);
+
+      // If we're entering real mode, restore cached data before painting
+      if (mode === "real") {
+        this._restoreCachedRealTiles();
+      }
     }
 
     // Update state
@@ -176,7 +192,9 @@ export class AppController {
 
       // Initialize fetching progress counter
       this.fetchingTotal = this.assets.length;
-      this.fetchingCompleted = 0;
+      this.fetchingCompleted = this._countTilesWithData();
+      this.fetchingJustCompleted =
+        this.fetchingCompleted >= this.fetchingTotal && this.fetchingTotal > 0;
 
       // Start transport
       const tickers = this.assets.map((a) => a.ticker);
@@ -316,6 +334,12 @@ export class AppController {
     this.transport.on("rest:rate_limited", (data) => {
       const seconds = Math.ceil(data.backoffDelay / 1000);
       this._showToast(`Rate limited - cooling down for ${seconds}s`);
+
+      // Immediately update fetching progress to show cooldown status
+      this._updateFetchingProgress();
+
+      // Start interval to update countdown every second
+      this._startRateLimitCountdown();
     });
 
     this.transport.on("error", (error) => {
@@ -328,7 +352,10 @@ export class AppController {
         error.code === "AUTH_FAILED" ||
         error.code === "INVALID_API_KEY"
       ) {
-        this._showToast("Invalid API key - check settings");
+        const proxyHint = shouldUseProxy()
+          ? "Proxy could not fetch data - verify FINNHUB_API_KEY on the proxy service."
+          : "Invalid API key - check settings";
+        this._showToast(proxyHint);
         this._markApiKeyAsInvalid();
       } else if (error.code === "FORBIDDEN_ORIGIN") {
         this._showToast(
@@ -451,6 +478,97 @@ export class AppController {
    */
   _renderAllDots() {
     this.tileController.refreshDots();
+  }
+
+  /**
+   * Keep sparkline history aligned with the current asset list
+   * @param {Array} assets
+   * @param {'simulation' | 'real'} mode
+   * @private
+   */
+  _reconcilePriceHistory(assets, mode) {
+    if (!this.tileRegistry?.priceHistory) return;
+
+    const desired = new Set(assets.map((a) => a.ticker));
+    const history = this.tileRegistry.priceHistory;
+
+    // Drop history for removed tickers
+    history.forEach((_, ticker) => {
+      if (!desired.has(ticker)) {
+        history.delete(ticker);
+      }
+    });
+
+    // Ensure new tickers have a buffer
+    assets.forEach((asset) => {
+      if (!history.has(asset.ticker)) {
+        history.set(asset.ticker, mode === "simulation" ? [asset.price] : []);
+      }
+    });
+  }
+
+  /**
+   * Sync renderer references after the registry assets change
+   * @private
+   */
+  _syncRendererWithRegistry() {
+    if (!this.tileController?.renderer || !this.tileRegistry) return;
+    const renderer = this.tileController.renderer;
+    renderer.assets = this.tileRegistry.assets;
+    renderer.assetIndexLookup = this.tileRegistry.assetIndexLookup;
+    renderer.tileCache = this.tileRegistry.tileCache;
+    renderer.priceHistory = this.tileRegistry.priceHistory;
+  }
+
+  /**
+   * Count tiles that already have complete data (price and change)
+   * @private
+   */
+  _countTilesWithData() {
+    let withData = 0;
+    this.state.getAllTiles().forEach((tile) => {
+      if (tile?.hasInfo && tile.price != null && tile.change != null) {
+        withData++;
+      }
+    });
+    return withData;
+  }
+
+  /**
+   * Snapshot current real tiles so we can restore after toggling modes
+   * @private
+   */
+  _snapshotRealTiles() {
+    if (this.state.getMode() !== "real") return;
+    this.cachedRealTiles = new Map();
+    this.state.getAllTiles().forEach((tile, ticker) => {
+      if (!tile) return;
+      this.cachedRealTiles.set(ticker, { ...tile });
+    });
+    log.debug(`Snapshot ${this.cachedRealTiles.size} real tiles`);
+  }
+
+  /**
+   * Restore cached real tiles when returning to real mode
+   * @private
+   */
+  _restoreCachedRealTiles() {
+    if (!this.cachedRealTiles || this.cachedRealTiles.size === 0) return;
+
+    this.cachedRealTiles.forEach((cached, ticker) => {
+      const tile = this.state.getTile(ticker);
+      if (!tile) return;
+
+      Object.assign(tile, cached, { dirty: true, hasInfo: cached.hasInfo });
+
+      // Seed price history so sparklines show last known price
+      if (this.tileRegistry?.priceHistory) {
+        const history = cached.price != null ? [cached.price] : [];
+        this.tileRegistry.priceHistory.set(ticker, history);
+      }
+    });
+
+    log.debug(`Restored ${this.cachedRealTiles.size} cached real tiles`);
   }
 
   // Sparkline rendering handled by TileRenderer
@@ -673,6 +791,20 @@ export class AppController {
       return;
     }
 
+    // Check if REST client is in rate limit backoff
+    if (this.transport.rest) {
+      const backoffStatus = this.transport.rest.getBackoffStatus();
+      if (backoffStatus.inBackoff) {
+        const remainingSeconds = Math.ceil(backoffStatus.remainingMs / 1000);
+        this._updateStatusIndicator(
+          "fetching",
+          `Rate Limited (cooldown: ${remainingSeconds}s)`,
+        );
+        perfEnd(perfId);
+        return;
+      }
+    }
+
     // Count tiles with COMPLETE data (price AND change)
     let tilesWithData = 0;
     this.state.getAllTiles().forEach((tile) => {
@@ -700,6 +832,38 @@ export class AppController {
       this.fetchingJustCompleted = false;
     }
     perfEnd(perfId);
+  }
+
+  /**
+   * Start interval to update rate limit countdown every second
+   * @private
+   */
+  _startRateLimitCountdown() {
+    // Clear existing interval if any
+    if (this.rateLimitInterval) {
+      clearInterval(this.rateLimitInterval);
+      this.rateLimitInterval = null;
+    }
+
+    // Update every second while in backoff
+    this.rateLimitInterval = setInterval(() => {
+      if (!this.transport.rest) {
+        clearInterval(this.rateLimitInterval);
+        this.rateLimitInterval = null;
+        return;
+      }
+
+      const backoffStatus = this.transport.rest.getBackoffStatus();
+      if (!backoffStatus.inBackoff) {
+        // Backoff expired - clear interval and update UI
+        clearInterval(this.rateLimitInterval);
+        this.rateLimitInterval = null;
+        this._updateFetchingProgress();
+      } else {
+        // Still in backoff - update countdown
+        this._updateFetchingProgress();
+      }
+    }, 1000); // Update every second
   }
 
   /**
@@ -962,31 +1126,87 @@ export class AppController {
       ? nextAssets
       : this._resolveAssetsForMode(mode);
 
-    this.switchAssets(resolvedAssets, mode);
+    const previousAssets = this.assets;
+    const newTickers = resolvedAssets.map((a) => a.ticker);
+    const previousTickers = previousAssets.map((a) => a.ticker);
+
+    const addedTickers = newTickers.filter((t) => !previousTickers.includes(t));
+    const removedTickers = previousTickers.filter((t) => !newTickers.includes(t));
+    const preserveExistingData = mode === "real";
+    const transportRunning = mode === "real" && this.transport.isRunning;
+    const fetchedBefore = new Set();
+    if (mode === "real") {
+      this.state.getAllTiles().forEach((tile, ticker) => {
+        if (tile?.hasInfo && tile.price != null && tile.change != null) {
+          fetchedBefore.add(ticker);
+        }
+      });
+    }
+
+    // Update references and reconcile state without clearing existing real-data tiles
+    this.assets = resolvedAssets;
+    this.simulation.assets = resolvedAssets;
+    this.state.reconcileTiles(resolvedAssets, {
+      preserveExistingData,
+      mode,
+    });
+
+    // Keep sparkline history aligned with the new asset list
+    this._reconcilePriceHistory(resolvedAssets, mode);
+
+    // Update views/DOM
+    if (this.modalView) this.modalView.updateAssets(resolvedAssets);
+    if (this.heatmapView) this.heatmapView.updateAssets(resolvedAssets);
+
+    // Refresh registry + renderer cache for the rebuilt DOM
+    this.tileRegistry.setAssets(resolvedAssets);
+    this.tileRegistry.initializeDOMCache();
+    this._syncRendererWithRegistry();
+    this.tileController.markAllDirty();
+    this._renderAllDots();
+    this.paintAll();
 
     if (mode === "real") {
-      const tickers = resolvedAssets.map((a) => a.ticker);
-      this.fetchingTotal = tickers.length;
-      this.fetchingCompleted = 0;
-      this.fetchingJustCompleted = false;
+      const tilesWithData = this._countTilesWithData();
+      const baselineFetched = newTickers.reduce(
+        (count, ticker) => count + (fetchedBefore.has(ticker) ? 1 : 0),
+        0,
+      );
+      this.fetchingTotal = newTickers.length;
+      this.fetchingCompleted = Math.min(
+        Math.max(tilesWithData, baselineFetched),
+        this.fetchingTotal,
+      );
+      this.fetchingJustCompleted = this.fetchingCompleted >= this.fetchingTotal;
       this._updateFetchingProgress();
 
-      if (this.transport.isRunning) {
-        this.simulation.stopTransport();
-        setTimeout(() => {
-          this.simulation.startTransport(tickers);
-        }, 350);
-      } else {
-        this.transport.setDesiredTickers?.(tickers);
-        if (!this.transport.setDesiredTickers) {
-          this.transport.subscribedTickers = new Set(tickers);
+      if (transportRunning) {
+        this.transport.subscribedTickers = new Set(newTickers);
+
+        if (addedTickers.length > 0 && this.transport.ws) {
+          this.transport.ws.subscribe(addedTickers);
+          log.info(`Subscribed to ${addedTickers.length} new ticker(s): ${addedTickers.join(", ")}`);
+
+          // Warm up new tickers via REST without clearing existing progress
+          this.transport.warmupTickers(addedTickers).catch((error) => {
+            log.warn("Warmup fetch failed:", error?.message || error);
+          });
         }
+
+        // Unsubscribe from removed tickers
+        if (removedTickers.length > 0 && this.transport.ws) {
+          this.transport.ws.unsubscribe(removedTickers);
+          log.info(`Unsubscribed from ${removedTickers.length} ticker(s): ${removedTickers.join(", ")}`);
+        }
+      } else {
+        this.transport.setDesiredTickers?.(newTickers);
+        if (!this.transport.setDesiredTickers) {
+          this.transport.subscribedTickers = new Set(newTickers);
+        }
+        this.fetchingJustCompleted = this.fetchingCompleted >= this.fetchingTotal;
       }
-    } else {
-      this.simulation.assets = resolvedAssets;
-      if (!this.simulation.isRunning()) {
-        this.simulation.start();
-      }
+    } else if (!this.simulation.isRunning()) {
+      this.simulation.start();
     }
 
     if (!options.silent) {
@@ -1008,10 +1228,11 @@ export class AppController {
   /**
    * Search tickers using the transport's REST client
    * @param {string} query
+   * @param {Object} [options]
    * @returns {Promise<Array>}
    */
-  async searchSymbols(query) {
-    return this.transport.searchSymbols(query);
+  async searchSymbols(query, options = {}) {
+    return this.transport.searchSymbols(query, options);
   }
 
   /**
