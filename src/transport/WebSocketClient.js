@@ -1,17 +1,9 @@
-/**
- * WebSocketClient - Robust WebSocket connection manager
- * Handles reconnection, heartbeat, and subscription persistence
- */
-
 import { EventEmitter } from '../core/EventEmitter.js';
 import { CONFIG, getApiEndpoints, shouldUseProxy } from '../config.js';
 import { logger } from '../utils/Logger.js';
 
 const log = logger.child('WS');
 
-/**
- * Connection states
- */
 const States = {
   DISCONNECTED: 'disconnected',
   CONNECTING: 'connecting',
@@ -27,41 +19,31 @@ export class WebSocketClient extends EventEmitter {
     this.apiKey = apiKey;
     this.ws = null;
     this.state = States.DISCONNECTED;
+    this.manualClose = false;
     
-    // Reconnection management
     this.reconnectAttempts = 0;
     this.reconnectTimer = null;
     this.maxReconnectAttempts = CONFIG.FINNHUB.RECONNECT.MAX_RETRIES;
     
-    // Subscription persistence
     this.subscribedSymbols = new Set();
     this.pendingSubscriptions = new Set();
     
-    // Heartbeat/ping management
     this.heartbeatInterval = null;
     this.lastPongTime = 0;
-    this.heartbeatIntervalMs = 30000; // 30 seconds
+    this.heartbeatIntervalMs = 30000;
   }
 
-  /**
-   * Set or update API key
-   * @param {string} apiKey
-   */
   setApiKey(apiKey) {
     if (this.apiKey !== apiKey) {
       this.apiKey = apiKey;
       log.info('API key updated');
       
-      // Reconnect if currently connected
       if (this.state === States.CONNECTED) {
         this.reconnect();
       }
     }
   }
 
-  /**
-   * Connect to Finnhub WebSocket
-   */
   connect() {
     if (this.state === States.CONNECTED || this.state === States.CONNECTING) {
       log.warn('Already connected or connecting');
@@ -78,13 +60,13 @@ export class WebSocketClient extends EventEmitter {
     this._setState(States.CONNECTING);
     log.info('Connecting to Finnhub WebSocket...');
 
-    // Get correct WebSocket URL based on PROXY_MODE
     const endpoints = getApiEndpoints();
     const url = endpoints.useProxy
-      ? endpoints.wsUrl  // Proxy handles authentication
-      : `${endpoints.wsUrl}?token=${this.apiKey}`;  // Direct connection
+      ? endpoints.wsUrl
+      : `${endpoints.wsUrl}?token=${this.apiKey}`;
 
     try {
+      this.manualClose = false;
       this.ws = new WebSocket(url);
       this._attachHandlers();
     } catch (error) {
@@ -93,10 +75,6 @@ export class WebSocketClient extends EventEmitter {
     }
   }
 
-  /**
-   * Attach WebSocket event handlers
-   * @private
-   */
   _attachHandlers() {
     if (!this.ws) return;
 
@@ -106,34 +84,23 @@ export class WebSocketClient extends EventEmitter {
     this.ws.onclose = (event) => this._onClose(event);
   }
 
-  /**
-   * Handle WebSocket open event
-   * @private
-   */
   _onOpen() {
     log.info('WebSocket connected');
     this._setState(States.CONNECTED);
     this.reconnectAttempts = 0;
     this.lastPongTime = Date.now();
 
-    // Start heartbeat
     this._startHeartbeat();
 
-    // Re-subscribe to all symbols
     this._resubscribeAll();
 
     this.emit('connected', {});
   }
 
-  /**
-   * Handle WebSocket message event
-   * @private
-   */
   _onMessage(event) {
     try {
       const data = JSON.parse(event.data);
 
-      // Handle ping from server - respond with pong
       if (data.type === 'ping') {
         this._send({ type: 'pong', timestamp: Date.now() });
         this.lastPongTime = Date.now();
@@ -141,20 +108,17 @@ export class WebSocketClient extends EventEmitter {
         return;
       }
 
-      // Handle pong from server (if we sent ping)
       if (data.type === 'pong') {
         this.lastPongTime = Date.now();
         log.debug('Received pong from server');
         return;
       }
 
-      // Handle trade data
       if (data.type === 'trade') {
         this._handleTradeData(data);
         return;
       }
 
-      // Log other message types for debugging
       log.debug('Received message:', data);
 
     } catch (error) {
@@ -162,10 +126,6 @@ export class WebSocketClient extends EventEmitter {
     }
   }
 
-  /**
-   * Handle trade data from WebSocket
-   * @private
-   */
   _handleTradeData(data) {
     if (!Array.isArray(data.data)) return;
 
@@ -174,7 +134,6 @@ export class WebSocketClient extends EventEmitter {
       
       if (!symbol || price == null) return;
 
-      // Emit trade event for each ticker
       this.emit('trade', {
         ticker: symbol,
         price: parseFloat(price),
@@ -184,10 +143,6 @@ export class WebSocketClient extends EventEmitter {
     });
   }
 
-  /**
-   * Handle WebSocket error event
-   * @private
-   */
   _onError(error) {
     log.error('WebSocket error:', error);
     this.emit('error', { 
@@ -197,29 +152,25 @@ export class WebSocketClient extends EventEmitter {
     });
   }
 
-  /**
-   * Handle WebSocket close event
-   * @private
-   */
   _onClose(event) {
+    const shouldReconnect = this.state !== States.STOPPED && !this.manualClose;
+    this.manualClose = false;
+
     const { code, reason, wasClean } = event;
     log.warn(`WebSocket closed [${code}]: ${reason || 'No reason'} (clean: ${wasClean})`);
 
     this._stopHeartbeat();
-    this._setState(States.DISCONNECTED);
+    if (shouldReconnect) {
+      this._setState(States.DISCONNECTED);
+    }
 
     this.emit('disconnected', { code, reason, wasClean });
 
-    // Auto-reconnect unless explicitly stopped
-    if (this.state !== States.STOPPED) {
+    if (shouldReconnect) {
       this._scheduleReconnect();
     }
   }
 
-  /**
-   * Subscribe to symbol(s)
-   * @param {string | string[]} symbols - Single symbol or array of symbols
-   */
   subscribe(symbols) {
     const symbolArray = Array.isArray(symbols) ? symbols : [symbols];
     
@@ -237,10 +188,6 @@ export class WebSocketClient extends EventEmitter {
     });
   }
 
-  /**
-   * Unsubscribe from symbol(s)
-   * @param {string | string[]} symbols - Single symbol or array of symbols
-   */
   unsubscribe(symbols) {
     const symbolArray = Array.isArray(symbols) ? symbols : [symbols];
     
@@ -254,28 +201,16 @@ export class WebSocketClient extends EventEmitter {
     });
   }
 
-  /**
-   * Send subscribe message
-   * @private
-   */
   _sendSubscribe(symbol) {
     this._send({ type: 'subscribe', symbol });
     log.debug(`Subscribed to ${symbol}`);
   }
 
-  /**
-   * Send unsubscribe message
-   * @private
-   */
   _sendUnsubscribe(symbol) {
     this._send({ type: 'unsubscribe', symbol });
     log.debug(`Unsubscribed from ${symbol}`);
   }
 
-  /**
-   * Re-subscribe to all symbols after reconnection
-   * @private
-   */
   _resubscribeAll() {
     const allSymbols = new Set([
       ...this.subscribedSymbols,
@@ -293,10 +228,6 @@ export class WebSocketClient extends EventEmitter {
     this.pendingSubscriptions.clear();
   }
 
-  /**
-   * Send data through WebSocket
-   * @private
-   */
   _send(data) {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       log.warn('Cannot send: WebSocket not open');
@@ -312,15 +243,10 @@ export class WebSocketClient extends EventEmitter {
     }
   }
 
-  /**
-   * Start heartbeat interval
-   * @private
-   */
   _startHeartbeat() {
     this._stopHeartbeat();
 
     this.heartbeatInterval = setInterval(() => {
-      // Check if we haven't received pong in a while
       const timeSinceLastPong = Date.now() - this.lastPongTime;
       
       if (timeSinceLastPong > this.heartbeatIntervalMs * 2) {
@@ -330,10 +256,6 @@ export class WebSocketClient extends EventEmitter {
     }, this.heartbeatIntervalMs);
   }
 
-  /**
-   * Stop heartbeat interval
-   * @private
-   */
   _stopHeartbeat() {
     if (this.heartbeatInterval) {
       clearInterval(this.heartbeatInterval);
@@ -341,15 +263,10 @@ export class WebSocketClient extends EventEmitter {
     }
   }
 
-  /**
-   * Schedule reconnection with exponential backoff
-   * @private
-   */
   _scheduleReconnect() {
     if (this.reconnectTimer) return;
     if (this.state === States.STOPPED) return;
 
-    // Check if max retries exceeded
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
       log.error(`Max reconnection attempts (${this.maxReconnectAttempts}) exceeded`);
       this._setState(States.STOPPED);
@@ -378,18 +295,12 @@ export class WebSocketClient extends EventEmitter {
     }, delay);
   }
 
-  /**
-   * Force reconnection
-   */
   reconnect() {
     log.info('Forcing reconnect...');
     this.disconnect();
     setTimeout(() => this.connect(), 100);
   }
 
-  /**
-   * Disconnect WebSocket
-   */
   disconnect() {
     this._stopHeartbeat();
     
@@ -399,6 +310,7 @@ export class WebSocketClient extends EventEmitter {
     }
 
     if (this.ws) {
+      this.manualClose = true;
       try {
         this.ws.close(1000, 'Client disconnect');
       } catch (error) {
@@ -407,12 +319,11 @@ export class WebSocketClient extends EventEmitter {
       this.ws = null;
     }
 
-    this._setState(States.DISCONNECTED);
+    if (this.state !== States.STOPPED) {
+      this._setState(States.DISCONNECTED);
+    }
   }
 
-  /**
-   * Stop WebSocket (no auto-reconnect)
-   */
   stop() {
     log.info('Stopping WebSocket...');
     this._setState(States.STOPPED);
@@ -421,10 +332,6 @@ export class WebSocketClient extends EventEmitter {
     this.pendingSubscriptions.clear();
   }
 
-  /**
-   * Set connection state
-   * @private
-   */
   _setState(state) {
     if (this.state !== state) {
       const oldState = this.state;
@@ -434,18 +341,10 @@ export class WebSocketClient extends EventEmitter {
     }
   }
 
-  /**
-   * Get current connection state
-   * @returns {string}
-   */
   getState() {
     return this.state;
   }
 
-  /**
-   * Check if connected
-   * @returns {boolean}
-   */
   isConnected() {
     return this.state === States.CONNECTED;
   }

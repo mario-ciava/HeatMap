@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "echo \"Run a static server to serve index.html\"",
-    "test": "vitest"
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "build:images": "docker compose build web proxy && docker builder prune -f"
   },
   "devDependencies": {
     "vitest": "^1.0.0"

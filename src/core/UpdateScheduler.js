@@ -38,7 +38,11 @@ export class UpdateScheduler {
   }
 
   flushImmediate() {
-    if (!this.pending.size) return;
+    if (!this.pending.size) {
+      this.flushCallback([], true);
+      this.frameScheduled = false;
+      return;
+    }
     this._flush(true);
   }
 

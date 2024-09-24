@@ -1,8 +1,3 @@
-/**
- * RESTClient - HTTP client for Finnhub REST API
- * Handles rate limiting, 429 backoff, and CORS-safe requests
- */
-
 import { EventEmitter } from '../core/EventEmitter.js';
 import { CONFIG, getApiEndpoints } from '../config.js';
 import { logger } from '../utils/Logger.js';
@@ -15,29 +10,23 @@ export class RESTClient extends EventEmitter {
 
     this.apiKey = apiKey;
 
-    // Determine endpoints based on PROXY_MODE
     const endpoints = getApiEndpoints();
     this.baseUrl = endpoints.restBase;
     this.useProxy = endpoints.useProxy;
     
-    // Rate limiting state
     this.requestCount = 0;
     this.requestWindow = Date.now();
     this.maxRequestsPerMinute = CONFIG.FINNHUB.RATE_LIMIT.MAX_CALLS_PER_MINUTE;
     
-    // 429 backoff state
     this.backoffUntil = 0;
     this.backoffDelay = 0;
     
-    // Request queue for concurrency control
     this.activeRequests = 0;
     this.maxConcurrent = 5;
     this.requestQueue = [];
     
-    // AbortController for cancellation
     this.abortController = null;
     
-    // Environment check
     this.isHttpOrigin = /^https?:$/i.test(location.protocol);
     
     if (!this.isHttpOrigin) {
@@ -45,10 +34,6 @@ export class RESTClient extends EventEmitter {
     }
   }
 
-  /**
-   * Set or update API key
-   * @param {string} apiKey
-   */
   setApiKey(apiKey) {
     if (this.apiKey !== apiKey) {
       this.apiKey = apiKey;
@@ -56,22 +41,12 @@ export class RESTClient extends EventEmitter {
     }
   }
 
-  /**
-   * Check if REST is available (not in backoff and HTTP origin)
-   * @returns {boolean}
-   */
   isAvailable() {
     if (!this.isHttpOrigin) return false;
     if (this.backoffUntil > Date.now()) return false;
     return true;
   }
 
-  /**
-   * Fetch quote for a single ticker
-   * @param {string} ticker
-   * @param {AbortSignal} [signal]
-   * @returns {Promise<Object|null>}
-   */
   async fetchQuote(ticker, signal, options = {}) {
     if (!this.isAvailable()) {
       log.debug(`REST unavailable for ${ticker}`);
@@ -81,33 +56,35 @@ export class RESTClient extends EventEmitter {
     const endpoint = `/quote?symbol=${encodeURIComponent(ticker)}`;
 
     try {
-      const data = await this._request(endpoint, signal);
+      const data = await this._request(endpoint, signal, options);
 
       if (!data || typeof data.c !== 'number') {
         return null;
       }
 
-      // Calculate change percent with fallback chain
       let changePercent = data.dp;
       let basePrice = data.pc;
 
       if (changePercent == null) {
-        // Try previousClose first
         if (data.pc != null && data.pc > 0) {
           changePercent = ((data.c - data.pc) / data.pc) * 100;
           basePrice = data.pc;
         }
-        // Fallback to open price
         else if (data.o != null && data.o > 0) {
           changePercent = ((data.c - data.o) / data.o) * 100;
           basePrice = data.o;
         }
-        // Final fallback: 0%
         else {
           changePercent = 0;
           basePrice = data.c;
         }
       }
+
+      const rawTs = Number(data.t ?? data.timestamp ?? data.T ?? 0);
+      const timestamp =
+        Number.isFinite(rawTs) && rawTs > 0
+          ? (rawTs < 2_000_000_000 ? rawTs * 1000 : rawTs)
+          : Date.now();
 
       return {
         ticker,
@@ -117,7 +94,7 @@ export class RESTClient extends EventEmitter {
         high: data.h,
         low: data.l,
         open: data.o,
-        timestamp: Date.now()
+        timestamp
       };
 
     } catch (error) {
@@ -131,13 +108,8 @@ export class RESTClient extends EventEmitter {
     }
   }
 
-  /**
-   * Search for tickers by symbol or company name
-   * @param {string} query
-   * @param {AbortSignal} [signal]
-   * @returns {Promise<Array>}
-   */
-  async searchSymbols(query, signal) {
+  async searchSymbols(query, options = {}) {
+    const { signal } = options;
     if (!this.isAvailable()) {
       throw new Error('REST unavailable for search');
     }
@@ -148,17 +120,11 @@ export class RESTClient extends EventEmitter {
     }
 
     const endpoint = `/search?q=${encodeURIComponent(trimmed)}`;
-    const data = await this._request(endpoint, signal);
+    const data = await this._request(endpoint, signal, options);
     return Array.isArray(data?.result) ? data.result : [];
   }
 
-  /**
-   * Fetch market status for an exchange
-   * @param {string} exchange - Exchange code (e.g., 'US', 'L', 'GER')
-   * @param {AbortSignal} [signal]
-   * @returns {Promise<Object|null>}
-   */
-  async fetchMarketStatus(exchange, signal) {
+  async fetchMarketStatus(exchange, signal, options = {}) {
     if (!this.isAvailable()) {
       log.debug(`REST unavailable for market status ${exchange}`);
       return null;
@@ -167,11 +133,10 @@ export class RESTClient extends EventEmitter {
     const endpoint = `/stock/market-status?exchange=${encodeURIComponent(exchange)}`;
     
     try {
-      const data = await this._request(endpoint, signal);
+      const data = await this._request(endpoint, signal, options);
       
       if (!data) return null;
 
-      // Normalize response (Finnhub returns various formats)
       const isOpen = 
         data.isOpen === true || 
         data.market === 'open' || 
@@ -194,12 +159,6 @@ export class RESTClient extends EventEmitter {
     }
   }
 
-  /**
-   * Batch fetch quotes for multiple tickers with concurrency control
-   * @param {string[]} tickers
-   * @param {AbortSignal} [signal]
-   * @returns {Promise<Object[]>} Array of successful quote results
-   */
   async fetchQuoteBatch(tickers, signal) {
     if (!this.isAvailable()) {
       log.debug('REST unavailable for batch fetch');
@@ -211,7 +170,6 @@ export class RESTClient extends EventEmitter {
     const results = [];
     let processed = 0;
 
-    // Process with concurrency limit
     const processTicker = async (ticker) => {
       const quote = await this.fetchQuote(ticker, signal);
       processed++;
@@ -220,19 +178,16 @@ export class RESTClient extends EventEmitter {
         results.push(quote);
       }
 
-      // Progress logging
       if (processed % 10 === 0 || processed === tickers.length) {
         log.debug(`Batch progress: ${processed}/${tickers.length}`);
       }
     };
 
-    // Create chunks based on concurrency limit
     const chunks = [];
     for (let i = 0; i < tickers.length; i += this.maxConcurrent) {
       chunks.push(tickers.slice(i, i + this.maxConcurrent));
     }
 
-    // Process chunks sequentially, items within chunk in parallel
     for (const chunk of chunks) {
       if (signal?.aborted) break;
       await Promise.all(chunk.map(processTicker));
@@ -242,21 +197,15 @@ export class RESTClient extends EventEmitter {
     return results;
   }
 
-  /**
-   * Make HTTP request with rate limiting and error handling
-   * @private
-   */
-  async _request(endpoint, signal) {
-    // Check rate limit
+  async _request(endpoint, signal, requestOptions = {}) {
+    const { suppressAuthErrors = false } = requestOptions;
     await this._checkRateLimit();
 
-    // Check backoff
     if (this.backoffUntil > Date.now()) {
       const waitMs = this.backoffUntil - Date.now();
       throw new Error(`In backoff cooldown (${Math.ceil(waitMs / 1000)}s remaining)`);
     }
 
-    // Build URL: in proxy mode, DON'T append token (handled server-side by Worker)
     const url = this.useProxy
       ? `${this.baseUrl}${endpoint}`
       : `${this.baseUrl}${endpoint}${endpoint.includes('?') ? '&' : '?'}token=${this.apiKey}`;
@@ -270,19 +219,16 @@ export class RESTClient extends EventEmitter {
         }
       });
 
-      // Handle rate limiting
       if (response.status === 429) {
         this._handleRateLimit();
         throw new Error('Rate limited (429)');
       }
 
-      // Handle worker-origin restrictions before generic auth handler
       if (response.status === 403 && this.useProxy) {
         let payload = null;
         try {
           payload = await response.clone().json();
         } catch {
-          // Ignore JSON parse failure, fallback to generic error
         }
 
         if (payload?.error === 'Forbidden origin') {
@@ -293,81 +239,67 @@ export class RESTClient extends EventEmitter {
         }
       }
 
-      // Handle authentication errors
       if (response.status === 401 || response.status === 403) {
         const error = new Error(`Authentication failed (${response.status})`);
         error.code = 'AUTH_FAILED';
-        this.emit('error', error);
-        throw error;
+        if (!suppressAuthErrors) {
+          this.emit('error', error);
+          throw error;
+        }
+        log.warn(`Auth failure suppressed for request ${endpoint}`);
+        return null;
       }
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
-      // Track successful request
       this._incrementRequestCount();
 
       return await response.json();
 
     } catch (error) {
       if (error.name === 'AbortError') {
-        throw error; // Propagate abort
+        throw error;
       }
 
-      // Generic network error
       log.debug('Request failed:', error.message);
       throw error;
     }
   }
 
-  /**
-   * Check and enforce rate limit
-   * @private
-   */
   async _checkRateLimit() {
     const now = Date.now();
-    const windowDuration = 60000; // 1 minute
+    const windowDuration = 60000;
 
-    // Reset counter if window expired
     if (now - this.requestWindow >= windowDuration) {
       this.requestCount = 0;
       this.requestWindow = now;
     }
 
-    // Wait if at limit
     if (this.requestCount >= this.maxRequestsPerMinute) {
       const waitMs = windowDuration - (now - this.requestWindow);
       log.warn(`Rate limit reached, waiting ${Math.ceil(waitMs / 1000)}s...`);
       await this._sleep(waitMs);
       
-      // Reset after wait
       this.requestCount = 0;
       this.requestWindow = Date.now();
     }
   }
 
-  /**
-   * Increment request counter
-   * @private
-   */
   _incrementRequestCount() {
     this.requestCount++;
     this.emit('request', { count: this.requestCount });
   }
 
-  /**
-   * Handle 429 rate limit response with exponential backoff
-   * @private
-   */
   _handleRateLimit() {
-    // First 429: wait configured amount
-    if (this.backoffDelay === 0) {
-      this.backoffDelay = CONFIG.FINNHUB.RATE_LIMIT.BACKOFF_429;
-    } else {
-      // Double the backoff (exponential), max 5 minutes
-      this.backoffDelay = Math.min(this.backoffDelay * 2, 300000);
-    }
+    const initial = CONFIG.FINNHUB.RATE_LIMIT.BACKOFF_429;
+    const increment = 30000;
+    const maxDelay = 120000;
+
+    this.backoffDelay = this.backoffDelay === 0
+      ? initial
+      : Math.min(this.backoffDelay + increment, maxDelay);
 
     this.backoffUntil = Date.now() + this.backoffDelay;
 
@@ -379,9 +311,6 @@ export class RESTClient extends EventEmitter {
     });
   }
 
-  /**
-   * Reset backoff (called after successful request post-backoff)
-   */
   resetBackoff() {
     if (this.backoffUntil > 0 && Date.now() > this.backoffUntil) {
       log.info('Backoff period ended, resuming normal operation');
@@ -390,17 +319,11 @@ export class RESTClient extends EventEmitter {
     }
   }
 
-  /**
-   * Create new abort controller for cancellation
-   */
   createAbortController() {
     this.abortController = new AbortController();
     return this.abortController;
   }
 
-  /**
-   * Abort all in-flight requests
-   */
   abortAll() {
     if (this.abortController) {
       log.info('Aborting all in-flight requests');
@@ -409,18 +332,10 @@ export class RESTClient extends EventEmitter {
     }
   }
 
-  /**
-   * Sleep utility
-   * @private
-   */
   _sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
-  /**
-   * Get backoff status
-   * @returns {Object}
-   */
   getBackoffStatus() {
     const inBackoff = this.backoffUntil > Date.now();
     return {

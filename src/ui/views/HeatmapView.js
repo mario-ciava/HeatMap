@@ -11,9 +11,6 @@ export class HeatmapView {
     this.app = app;
   }
 
-  /**
-   * Update assets and rebuild the heatmap
-   */
   updateAssets(newAssets) {
     this.assets = newAssets;
     if (this.container) {

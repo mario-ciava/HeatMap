@@ -1,45 +1,11 @@
-/**
- * PerfMonitor - lightweight performance tracker for runtime cost analysis.
- *
- * Features:
- * - start/end markers to time arbitrary sections
- * - measure helpers for sync/async functions
- * - counters for operations processed (weight)
- * - impact scoring (1-10) based on time-per-call and time-per-second budgets
- * - tabular report for quick inspection or console output
- *
- * Usage example:
- *
- *   import { perfMonitor, measureAsync } from "./PerfMonitor.js";
- *
- *   const marker = perfMonitor.start("updateSimulation");
- *   // ... do work ...
- *   perfMonitor.end(marker, processedItems.length);
- *
- *   await measureAsync("fetchQuote", () => fetchQuote(ticker));
- *
- *   console.table(perfMonitor.report({ toConsole: true, sortBy: "score" }));
- */
-
 const hasPerformance =
   typeof performance === "object" && typeof performance.now === "function";
 
 const now = () => (hasPerformance ? performance.now() : Date.now());
 
 const DEFAULT_THRESHOLDS = {
-  /**
-   * Thresholds for time spent per second (ms). Each boundary raises the impact score.
-   * Below 1ms → low cost, above 12ms → critical (dominates frame budget).
-   */
   perSecond: [1, 3, 6, 12],
-  /**
-   * Thresholds for time per call (ms). Helps spot expensive single invocations.
-   */
   perCall: [2, 5, 15, 30],
-  /**
-   * Total accumulated time within the sampling window (ms).
-   * Useful when a task runs infrequently but is still heavy overall.
-   */
   total: [30, 120, 300, 600],
 };
 
@@ -79,12 +45,6 @@ class PerfMonitor {
     this._nextId = 1;
   }
 
-  /**
-   * Begin timing a labeled section.
-   * @param {string} label
-   * @param {{weight?: number}} [meta]
-   * @returns {number} marker id
-   */
   start(label, meta = {}) {
     if (!label) throw new Error("PerfMonitor.start: label is required");
     const id = this._nextId++;
@@ -96,12 +56,6 @@ class PerfMonitor {
     return id;
   }
 
-  /**
-   * Finish timing for a marker.
-   * @param {number} id - Marker id returned by start()
-   * @param {number} [weight] - Units processed during the interval (defaults to meta.weight or 1)
-   * @returns {number|null} duration in ms
-   */
   end(id, weight) {
     const marker = this.activeMarks.get(id);
     if (!marker) return null;
@@ -122,12 +76,6 @@ class PerfMonitor {
     return duration;
   }
 
-  /**
-   * Record a manual measurement.
-   * @param {string} label
-   * @param {number} durationMs
-   * @param {{weight?: number, startTime?: number, endTime?: number}} [meta]
-   */
   record(label, durationMs, meta = {}) {
     const startTime =
       Number.isFinite(meta.startTime) && meta.startTime >= 0
@@ -145,19 +93,10 @@ class PerfMonitor {
     });
   }
 
-  /**
-   * Convenience wrapper for synchronous functions.
-   * @template T
-   * @param {string} label
-   * @param {Function} fn
-   * @param {{weight?: number}} [meta]
-   * @returns {T}
-   */
   measure(label, fn, meta = {}) {
     const id = this.start(label, meta);
     try {
       const result = fn();
-      // If fn returns a promise, delegate to measureAsync for consistent handling.
       if (result && typeof result.then === "function") {
         return result.finally(() => {
           this.end(id, meta.weight);
@@ -171,14 +110,6 @@ class PerfMonitor {
     }
   }
 
-  /**
-   * Convenience wrapper for async functions returning a promise.
-   * @template T
-   * @param {string} label
-   * @param {Function} fn - async function returning a Promise
-   * @param {{weight?: number}} [meta]
-   * @returns {Promise<T>}
-   */
   async measureAsync(label, fn, meta = {}) {
     const id = this.start(label, meta);
     try {
@@ -191,13 +122,6 @@ class PerfMonitor {
     }
   }
 
-  /**
-   * Wrap a function so each invocation is automatically measured.
-   * @param {string} label
-   * @param {Function} fn
-   * @param {{weightResolver?: (...args: any[]) => number}} [options]
-   * @returns {Function}
-   */
   wrap(label, fn, options = {}) {
     const weightResolver =
       typeof options.weightResolver === "function"
@@ -223,11 +147,6 @@ class PerfMonitor {
     };
   }
 
-  /**
-   * Increment a simple counter (no duration).
-   * @param {string} label
-   * @param {number} [weight=1]
-   */
   increment(label, weight = 1) {
     this._record(label, {
       duration: 0,
@@ -237,17 +156,6 @@ class PerfMonitor {
     });
   }
 
-  /**
-   * Produce an array of metrics with derived stats and impact scores.
-   * @param {{
-   *   minCount?: number,
-   *   sortBy?: "score" | "totalTime" | "perSecondTime" | "perCallTime",
-   *   limit?: number,
-   *   reset?: boolean,
-   *   toConsole?: boolean
-   * }} [options]
-   * @returns {Array<object>}
-   */
   report(options = {}) {
     const {
       minCount = 1,
@@ -311,9 +219,6 @@ class PerfMonitor {
     return limited;
   }
 
-  /**
-   * Clear all collected metrics.
-   */
   reset() {
     this.metrics.clear();
     this.activeMarks.clear();
@@ -430,4 +335,3 @@ export const measureAsync = (label, fn, meta) =>
   defaultMonitor.measureAsync(label, fn, meta);
 
 export const perfReport = (options) => defaultMonitor.report(options);
-

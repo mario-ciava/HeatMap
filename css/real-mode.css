@@ -1,5 +1,4 @@
 @layer legacy {
-/* Real-mode transitions */
 body.real-mode .control-section.sliders {
   display: none !important;
 }
@@ -36,7 +35,6 @@ body:not(.real-mode) .api-key-section {
   display: none !important;
 }
 
-/* Real-time status indicator */
 .asset-tile .status-dot {
   position: absolute;
   top: 8px;
