@@ -1,4 +1,3 @@
-/* Layer Cascade: Define order (lowest → highest priority) */
 @layer tokens, base, utilities, components, overrides, legacy;
 
 @layer tokens {
@@ -167,7 +166,6 @@
   --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
   --ease-snappy: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-smooth: cubic-bezier(0.33, 1, 0.68, 1);
-  /* Motion Contract: Immutable animation timings */
   --motion-fadeIn: 0.25s ease;
   --motion-fadeIn-delayed: 1s ease-out;
   --motion-fadeIn-delayed-0-2s: 1s ease-out 0.2s both;
@@ -194,8 +192,6 @@
   --motion-breathe: 3s ease-in-out infinite;
   --motion-breatheSlow: 4s ease-in-out infinite;
   --motion-spin: 0.8s linear infinite;
-  /* Semantic Tokens: Role-based aliases (no visual change) */
-  /* Colors */
   --color/surface/input-bg: var(--surface-input-bg);
   --color/surface/card-bg: var(--panel-card-bg);
   --color/surface/panel-bg: var(--panel-surface);
@@ -208,7 +204,6 @@
   --color/accent/primary: var(--accent-primary);
   --color/accent/secondary: var(--accent-secondary);
   --color/accent/tertiary: var(--accent-tertiary);
-  /* Spacing (magic numbers) */
   --space/xs: 8px;
   --space/sm: 12px;
   --space/md: 14px;
@@ -218,7 +213,6 @@
   --space/3xl: 28px;
   --space/4xl: 32px;
   --space/5xl: 40px;
-  /* Border Radius */
   --radius/sm: 10px;
   --radius/md: 12px;
   --radius/lg: 14px;
@@ -228,7 +222,6 @@
   --radius/4xl: 24px;
   --radius/full: 50%;
   --radius/pill: 999px;
-  /* Elevation (Box Shadows) */
   --elevation/1: 0 2px 8px rgba(0, 0, 0, 0.2);
   --elevation/2: 0 4px 12px rgba(0, 0, 0, 0.2);
   --elevation/3: 0 10px 28px rgba(0, 0, 0, 0.35);
@@ -236,7 +229,6 @@
   --elevation/5: 0 16px 40px rgba(0, 0, 0, 0.4);
   --elevation/6: 0 24px 48px rgba(0, 0, 0, 0.5);
   --elevation/modal: 0 30px 70px rgba(0, 0, 0, 0.55);
-  /* Component-specific heights */
   --height/input: 52px;
   --height/button: 44px;
   --tile-neutral-1: #2a2a2a;
@@ -258,7 +250,6 @@
   --accent-glow-strong: rgba(251, 146, 60, 0.6);
 }
 
-/* Theme: Thermal (default) */
 :root,
 body[data-theme="thermal"] {
   --loss-extreme: #1e3a5f;
@@ -302,7 +293,6 @@ body[data-theme="thermal"] {
   --accent-gradient-warm: var(--accent-gradient-tertiary-secondary);
 }
 
-/* Theme: Matrix */
 body[data-theme="matrix"] {
   --loss-extreme: #001a00;
   --loss-high: #003300;
@@ -392,7 +382,6 @@ body[data-theme="matrix"] {
   );
 }
 
-/* Theme: Ocean */
 body[data-theme="ocean"] {
   --loss-extreme: #011627;
   --loss-high: #023e8a;
@@ -482,7 +471,6 @@ body[data-theme="ocean"] {
   );
 }
 
-/* Theme: Sunset */
 body[data-theme="sunset"] {
   --loss-extreme: #1a1a2e;
   --loss-high: #2e2e4e;
@@ -572,7 +560,6 @@ body[data-theme="sunset"] {
   );
 }
 
-/* Theme: Monochrome */
 body[data-theme="monochrome"] {
   --loss-extreme: #c4c8cf;
   --loss-high: #d1d5dc;

@@ -1,8 +1,3 @@
-/**
- * AppController - Bridge between transport layer and UI
- * Manages application lifecycle and UI updates
- */
-
 import { FinnhubTransport } from "../transport/FinnhubTransport.js";
 import { StateManager } from "../core/StateManager.js";
 import { CONFIG, SIMULATION_ASSETS, REAL_DATA_ASSETS, shouldUseProxy, isLocalDevelopment } from "../config.js";
@@ -21,25 +16,18 @@ export class AppController {
     this.modalView = null;
     this.tileRegistry = new TileRegistry(this.assets);
 
-    // Initialize state manager with assets
     this.state = new StateManager(assets);
 
-    // Get API key from localStorage
     const savedApiKey = this._loadApiKey();
 
-    // Initialize transport
     this.transport = new FinnhubTransport(savedApiKey, this.state);
 
-    // UI state
-    // Fetching progress tracking
     this.fetchingTotal = 0;
     this.fetchingCompleted = 0;
     this.fetchingJustCompleted = false;
 
-    // Rate limit cooldown interval
     this.rateLimitInterval = null;
 
-    // Wire up event handlers
     this._setupEventHandlers();
     this.tileRegistry.initializeDOMCache();
 
@@ -64,34 +52,21 @@ export class AppController {
     log.info("AppController initialized");
   }
 
-  /**
-   * Set references to view components
-   * @param {Object} views - Object containing heatmapView and modalView
-   */
   setViews(views) {
     if (views.heatmapView) this.heatmapView = views.heatmapView;
     if (views.modalView) this.modalView = views.modalView;
   }
 
-  /**
-   * Switch to a new set of assets
-   * @param {Array} newAssets - New assets array
-   * @param {string} mode - Mode for which these assets are being set
-   */
   switchAssets(newAssets, mode) {
     log.info(`Switching to ${newAssets.length} assets for ${mode} mode`);
 
-    // Update assets reference
     this.assets = newAssets;
 
-    // Reinitialize state tiles
     this.state.reinitializeTiles(newAssets);
 
-    // Update tile registry
     this.tileRegistry.setAssets(newAssets);
     this._syncRendererWithRegistry();
 
-    // Update views
     if (this.modalView) {
       this.modalView.updateAssets(newAssets);
     }
@@ -99,55 +74,38 @@ export class AppController {
     if (this.heatmapView) {
       this.heatmapView.updateAssets(newAssets);
 
-      // Reinitialize DOM cache immediately after heatmap rebuild
-      // Use setTimeout to ensure DOM is updated
       setTimeout(() => {
         this.tileRegistry.initializeDOMCache();
         this.tileController.resetPriceHistory(mode);
         this._syncRendererWithRegistry();
 
-        // Re-render all tiles with new cache
         this.paintAll();
-      }, 50); // Small delay to ensure DOM is ready
+      }, 50);
     }
 
-    // Update simulation controller with new assets
     this.simulation.assets = newAssets;
   }
 
-  /**
-   * Initialize the application (call after DOM ready)
-   */
   init() {
     log.info("Initializing application...");
 
-    // Initialize status indicator
     this._updateStatusIndicator("live", "Live");
 
-    // Display current API key if exists
     const currentKey = this.transport.getApiKey();
     if (currentKey) {
       this._updateApiKeyDisplay(currentKey);
     }
 
-    // Start in simulation mode by default
     this.setMode("simulation");
 
-    // Setup UI event listeners
     this._setupUIListeners();
 
-    // Initial render
     this._renderAll();
   }
 
-  /**
-   * Set operating mode
-   * @param {'simulation' | 'real'} mode
-   */
   setMode(mode) {
     const oldMode = this.state.getMode();
 
-    // Allow initial setup even if mode is the same
     const isInitialSetup =
       oldMode === mode && !this.simulation.isRunning() && !this.transport.isRunning;
 
@@ -158,62 +116,49 @@ export class AppController {
 
     log.info(`Switching to ${mode} mode...`);
 
-    // Track if we're switching assets (and thus rebuilding everything)
     const isSwitchingAssets = oldMode !== mode;
 
-    // If leaving real mode, snapshot current real tiles to restore later
     if (oldMode === "real" && mode !== "real") {
       this._snapshotRealTiles();
     }
 
-    // Switch to appropriate asset list for the mode
     if (isSwitchingAssets) {
       const newAssets = this._resolveAssetsForMode(mode);
       this.switchAssets(newAssets, mode);
 
-      // If we're entering real mode, restore cached data before painting
       if (mode === "real") {
         this._restoreCachedRealTiles();
       }
     }
 
-    // Update state
     this.state.setMode(mode);
 
     if (mode === "real") {
-      // Stop simulation loop
       this.simulation.stop();
 
-      // Reset tiles only if we didn't just rebuild everything
       if (!isSwitchingAssets) {
         this.state.resetAllTiles(true);
         this.tileController.resetPriceHistory("real");
       }
 
-      // Initialize fetching progress counter
       this.fetchingTotal = this.assets.length;
       this.fetchingCompleted = this._countTilesWithData();
       this.fetchingJustCompleted =
         this.fetchingCompleted >= this.fetchingTotal && this.fetchingTotal > 0;
 
-      // Start transport
       const tickers = this.assets.map((a) => a.ticker);
       this.simulation.stopTransport();
       this.simulation.startTransport(tickers);
 
-      // Update UI
       this._updateModeIndicators();
       this._renderAllDots();
-      this.paintAll(); // Repaint tiles with preserved data or "---" placeholders
-      this._updateFetchingProgress(); // Show initial fetching status
+      this.paintAll();
+      this._updateFetchingProgress();
 
-      // Show toast
       this._showToast("Real data mode activated");
     } else {
-      // Stop transport
       this.simulation.stopTransport();
 
-      // Reset tiles only if we didn't just rebuild everything
       if (!isSwitchingAssets) {
         this.state.resetAllTiles(false);
         this.tileController.resetPriceHistory("simulation");
@@ -223,31 +168,21 @@ export class AppController {
       this.fetchingCompleted = 0;
       this.fetchingJustCompleted = false;
 
-      // Start simulation
       this.simulation.start();
 
-      // Update UI
       this._updateModeIndicators();
       this._renderAllDots();
-      this.paintAll(); // Repaint tiles with placeholder values
+      this.paintAll();
       this._updateStatusIndicator("live", "Live");
 
-      // Show toast
       this._showToast("Simulation mode activated");
     }
   }
 
-  /**
-   * Update a single tile's visual representation
-   * @param {string} ticker
-   */
   paintTile(ticker, indexHint = undefined) {
     this.tileController.renderImmediate(ticker, indexHint);
   }
 
-  /**
-   * Paint all tiles
-   */
   paintAll() {
     this.tileController.renderAll();
   }
@@ -256,12 +191,7 @@ export class AppController {
     return this.tileRegistry.priceHistory;
   }
 
-  /**
-   * Setup event handlers for state and transport
-   * @private
-   */
   _setupEventHandlers() {
-    // State events - Single tile update (Real Data mode)
     this.state.on("tile:updated", (payload = {}) => {
       const { ticker } = payload;
       if (!ticker) return;
@@ -279,7 +209,6 @@ export class AppController {
       }
     });
 
-    // State events - Batch tile updates (Simulation mode optimization)
     this.state.on("tiles:batch_updated", (payload = {}) => {
       const perfId = perfStart("state:batchUpdated");
 
@@ -295,7 +224,6 @@ export class AppController {
     });
 
     this.state.on("market:status", () => {
-      // Market status changed - update all dots
       this._renderAllDots();
     });
 
@@ -303,9 +231,7 @@ export class AppController {
       this.paintAll();
     });
 
-    // Transport events
     this.transport.on("started", ({ tickers }) => {
-      // Initialize fetching progress counter
       this.fetchingTotal = tickers.length;
       this.fetchingCompleted = 0;
       this._updateFetchingProgress();
@@ -320,14 +246,11 @@ export class AppController {
     });
 
     this.transport.on("quote", ({ ticker }) => {
-      // Quote handled by state manager
-      // Update progress if in real mode and still fetching
       const mode = this.state.getMode();
       if (mode === "real" && !this.fetchingJustCompleted) {
         this._updateFetchingProgress();
       }
 
-      // Clear invalid API key state on successful data
       this._clearApiKeyInvalidState();
     });
 
@@ -335,10 +258,8 @@ export class AppController {
       const seconds = Math.ceil(data.backoffDelay / 1000);
       this._showToast(`Rate limited - cooling down for ${seconds}s`);
 
-      // Immediately update fetching progress to show cooldown status
       this._updateFetchingProgress();
 
-      // Start interval to update countdown every second
       this._startRateLimitCountdown();
     });
 
@@ -365,16 +286,7 @@ export class AppController {
     });
   }
 
-  /**
-   * Setup DOM element cache
-   * @private
-   */
-  /**
-   * Setup UI event listeners
-   * @private
-   */
   _setupUIListeners() {
-    // Mode toggle
     const modeToggle = document.getElementById("mode-toggle");
     if (modeToggle) {
       modeToggle.addEventListener("change", (e) => {
@@ -382,7 +294,6 @@ export class AppController {
       });
     }
 
-    // API key save
     const saveBtn = document.getElementById("api-key-save");
     const input = document.getElementById("api-key-input");
     if (saveBtn && input) {
@@ -397,20 +308,16 @@ export class AppController {
         this.transport.setApiKey(key);
         this._showToast("API key saved");
 
-        // Clear input
         input.value = "";
 
-        // Update masked display and clear invalid state
         this._updateApiKeyDisplay(key);
         this._clearApiKeyInvalidState();
 
-        // If in real mode, restart transport to start fetching with new key
         if (this.state.getMode() === "real") {
           log.info("Restarting transport with new API key...");
           const tickers = this.assets.map((a) => a.ticker);
           this.simulation.stopTransport();
 
-          // Small delay before restarting
           setTimeout(() => {
             this.simulation.startTransport(tickers);
             this._showToast("Data fetching restarted");
@@ -419,7 +326,6 @@ export class AppController {
       });
     }
 
-    // API key visibility toggle
     const visibilityBtn = document.getElementById("api-key-visibility");
     const copyBtn = document.getElementById("api-key-copy");
     const displayInput = document.getElementById("api-key-display");
@@ -443,23 +349,19 @@ export class AppController {
       });
     }
 
-    // Pause/Resume fetching button
     const pauseFetchBtn = document.getElementById("pause-fetch-btn");
     if (pauseFetchBtn) {
       pauseFetchBtn.addEventListener("click", () => {
         const isPaused = pauseFetchBtn.classList.contains("paused");
 
         if (isPaused) {
-          // Resume fetching
           const resumed = this.resumeFetching();
           if (resumed) {
             pauseFetchBtn.classList.remove("paused");
             pauseFetchBtn.setAttribute("aria-label", "Pause fetching");
             pauseFetchBtn.setAttribute("title", "Pause fetching");
-            // Status will be automatically updated to "fetching" by transport events
           }
         } else {
-          // Pause fetching
           const paused = this.pauseFetching();
           if (paused) {
             pauseFetchBtn.classList.add("paused");
@@ -472,34 +374,22 @@ export class AppController {
     }
   }
 
-  /**
-   * Render all dots
-   * @private
-   */
   _renderAllDots() {
     this.tileController.refreshDots();
   }
 
-  /**
-   * Keep sparkline history aligned with the current asset list
-   * @param {Array} assets
-   * @param {'simulation' | 'real'} mode
-   * @private
-   */
   _reconcilePriceHistory(assets, mode) {
     if (!this.tileRegistry?.priceHistory) return;
 
     const desired = new Set(assets.map((a) => a.ticker));
     const history = this.tileRegistry.priceHistory;
 
-    // Drop history for removed tickers
     history.forEach((_, ticker) => {
       if (!desired.has(ticker)) {
         history.delete(ticker);
       }
     });
 
-    // Ensure new tickers have a buffer
     assets.forEach((asset) => {
       if (!history.has(asset.ticker)) {
         history.set(asset.ticker, mode === "simulation" ? [asset.price] : []);
@@ -507,10 +397,6 @@ export class AppController {
     });
   }
 
-  /**
-   * Sync renderer references after the registry assets change
-   * @private
-   */
   _syncRendererWithRegistry() {
     if (!this.tileController?.renderer || !this.tileRegistry) return;
     const renderer = this.tileController.renderer;
@@ -520,10 +406,6 @@ export class AppController {
     renderer.priceHistory = this.tileRegistry.priceHistory;
   }
 
-  /**
-   * Count tiles that already have complete data (price and change)
-   * @private
-   */
   _countTilesWithData() {
     let withData = 0;
     this.state.getAllTiles().forEach((tile) => {
@@ -534,10 +416,6 @@ export class AppController {
     return withData;
   }
 
-  /**
-   * Snapshot current real tiles so we can restore after toggling modes
-   * @private
-   */
   _snapshotRealTiles() {
     if (this.state.getMode() !== "real") return;
     this.cachedRealTiles = new Map();
@@ -548,10 +426,6 @@ export class AppController {
     log.debug(`Snapshot ${this.cachedRealTiles.size} real tiles`);
   }
 
-  /**
-   * Restore cached real tiles when returning to real mode
-   * @private
-   */
   _restoreCachedRealTiles() {
     if (!this.cachedRealTiles || this.cachedRealTiles.size === 0) return;
 
@@ -561,7 +435,6 @@ export class AppController {
 
       Object.assign(tile, cached, { dirty: true, hasInfo: cached.hasInfo });
 
-      // Seed price history so sparklines show last known price
       if (this.tileRegistry?.priceHistory) {
         const history = cached.price != null ? [cached.price] : [];
         this.tileRegistry.priceHistory.set(ticker, history);
@@ -570,8 +443,6 @@ export class AppController {
 
     log.debug(`Restored ${this.cachedRealTiles.size} cached real tiles`);
   }
-
-  // Sparkline rendering handled by TileRenderer
 
   setSimulationFrequency(ms) {
     const parsed = Number.parseInt(ms, 10);
@@ -662,18 +533,10 @@ export class AppController {
   }
 
 
-  /**
-   * Render all tiles
-   * @private
-   */
   _renderAll() {
     this.paintAll();
   }
 
-  /**
-   * Update mode indicators in UI
-   * @private
-   */
   _updateModeIndicators() {
     const mode = this.state.getMode();
     const label = document.getElementById("mode-toggle-label");
@@ -696,10 +559,6 @@ export class AppController {
     document.body.classList.toggle("real-mode", mode === "real");
   }
 
-  /**
-   * Update status indicator (unified Live/Fetching display)
-   * @private
-   */
   _updateStatusIndicator(mode = "live", message = null) {
     const el = document.getElementById("status-indicator");
     if (!el) return;
@@ -725,10 +584,6 @@ export class AppController {
     }
   }
 
-  /**
-   * Format relative time for last update
-   * @private
-   */
   _formatRelativeTime(date) {
     const now = new Date();
     const diff = now - date;
@@ -737,7 +592,6 @@ export class AppController {
     const hours = Math.floor(minutes / 60);
     const days = Math.floor(hours / 24);
 
-    // If less than 1 minute, show time
     if (minutes < 1) {
       return date.toLocaleTimeString([], {
         hour: "2-digit",
@@ -746,7 +600,6 @@ export class AppController {
       });
     }
 
-    // If same day, show time
     if (days === 0) {
       return date.toLocaleTimeString([], {
         hour: "2-digit",
@@ -755,12 +608,10 @@ export class AppController {
       });
     }
 
-    // If yesterday
     if (days === 1) {
       return `Yesterday ${date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`;
     }
 
-    // If 2-3 days ago
     if (days === 2) {
       return `2 days ago`;
     }
@@ -769,14 +620,9 @@ export class AppController {
       return `3 days ago`;
     }
 
-    // If older, show compact date
     return date.toLocaleDateString([], { month: "short", day: "numeric" });
   }
 
-  /**
-   * Update fetching progress display
-   * @private
-   */
   _updateFetchingProgress() {
     const perfId = perfStart("updateFetchingProgress");
     const mode = this.state.getMode();
@@ -785,13 +631,11 @@ export class AppController {
       return;
     }
 
-    // Don't update status if transport is paused
     if (!this.transport.isRunning) {
       perfEnd(perfId);
       return;
     }
 
-    // Check if REST client is in rate limit backoff
     if (this.transport.rest) {
       const backoffStatus = this.transport.rest.getBackoffStatus();
       if (backoffStatus.inBackoff) {
@@ -805,7 +649,6 @@ export class AppController {
       }
     }
 
-    // Count tiles with COMPLETE data (price AND change)
     let tilesWithData = 0;
     this.state.getAllTiles().forEach((tile) => {
       if (tile.hasInfo && tile.price != null && tile.change != null) {
@@ -816,15 +659,12 @@ export class AppController {
     this.fetchingCompleted = tilesWithData;
 
     if (this.fetchingCompleted >= this.fetchingTotal) {
-      // All data fetched - show Live with timestamp
       const now = new Date();
       const timeStr = this._formatRelativeTime(now);
       this._updateStatusIndicator("live", `Live | Last Update: ${timeStr}`);
 
-      // Mark fetching as complete
       this.fetchingJustCompleted = true;
     } else {
-      // Still fetching - show progress with spinner
       this._updateStatusIndicator(
         "fetching",
         `Fetching (${this.fetchingCompleted}/${this.fetchingTotal})`,
@@ -834,18 +674,12 @@ export class AppController {
     perfEnd(perfId);
   }
 
-  /**
-   * Start interval to update rate limit countdown every second
-   * @private
-   */
   _startRateLimitCountdown() {
-    // Clear existing interval if any
     if (this.rateLimitInterval) {
       clearInterval(this.rateLimitInterval);
       this.rateLimitInterval = null;
     }
 
-    // Update every second while in backoff
     this.rateLimitInterval = setInterval(() => {
       if (!this.transport.rest) {
         clearInterval(this.rateLimitInterval);
@@ -855,21 +689,15 @@ export class AppController {
 
       const backoffStatus = this.transport.rest.getBackoffStatus();
       if (!backoffStatus.inBackoff) {
-        // Backoff expired - clear interval and update UI
         clearInterval(this.rateLimitInterval);
         this.rateLimitInterval = null;
         this._updateFetchingProgress();
       } else {
-        // Still in backoff - update countdown
         this._updateFetchingProgress();
       }
-    }, 1000); // Update every second
+    }, 1000);
   }
 
-  /**
-   * Show toast notification
-   * @private
-   */
   _showToast(message, duration = 6500) {
     const toast = document.getElementById("toast");
     if (!toast) return;
@@ -882,28 +710,21 @@ export class AppController {
     }, duration);
   }
 
-  /**
-   * Load API key from localStorage with fallback to config
-   * @private
-   */
   _loadApiKey() {
     const useProxy = shouldUseProxy();
     const isLocal = isLocalDevelopment();
 
-    // PROXY MODE: API key managed server-side (secure)
     if (useProxy) {
-      log.info(`🔒 PROXY MODE: API key managed server-side (${isLocal ? 'testing locally' : 'production'})`);
+      log.info(`PROXY MODE: api key server-side (${isLocal ? 'local' : 'prod'})`);
       try {
-        this._updateApiKeyDisplay('');
+        this._updateApiKeyDisplay("");
       } catch {}
-      return '';  // Empty key since proxy handles authentication
+      return "";
     }
 
-    // LOCAL DEVELOPMENT MODE: use API key directly
-    log.info("🔧 LOCAL MODE: Using direct API connection");
+    log.info("LOCAL MODE: direct api key");
 
     try {
-      // Try to load from localStorage first
       const savedKey = localStorage.getItem(CONFIG.API_KEY.STORAGE_KEY);
 
       if (savedKey && savedKey.trim()) {
@@ -911,7 +732,6 @@ export class AppController {
         return savedKey;
       }
 
-      // Fallback to local dev key
       if (CONFIG.API_KEY.LOCAL_DEV_KEY) {
         log.info("Using LOCAL_DEV_KEY for development");
         return CONFIG.API_KEY.LOCAL_DEV_KEY;
@@ -925,10 +745,6 @@ export class AppController {
     }
   }
 
-  /**
-   * Save API key to localStorage
-   * @private
-   */
   _saveApiKey(key) {
     try {
       localStorage.setItem(CONFIG.API_KEY.STORAGE_KEY, key);
@@ -938,19 +754,14 @@ export class AppController {
     }
   }
 
-  /**
-   * Update API key display (masked)
-   * @private
-   */
   _updateApiKeyDisplay(key) {
     const display = document.getElementById("api-key-display");
     if (!display) return;
 
     const useProxy = shouldUseProxy();
 
-    // In proxy mode, show message instead of key
     if (useProxy) {
-      display.value = "🔒 Managed by proxy";
+      display.value = "Managed by proxy";
       display.dataset.actual = "";
       display.dataset.visibility = "masked";
       display.disabled = true;
@@ -971,10 +782,6 @@ export class AppController {
     this._syncApiKeyControls(actualKey);
   }
 
-  /**
-   * Mask API key for display
-   * @private
-   */
   _maskKey(key) {
     if (!key) return "";
     if (key.length <= 10) return "•".repeat(Math.max(0, key.length));
@@ -983,11 +790,6 @@ export class AppController {
     return "•".repeat(hiddenCount) + visible;
   }
 
-  /**
-   * Toggle API key visibility in UI
-   * @private
-   * @param {boolean} shouldShow
-   */
   _setApiKeyVisibility(shouldShow) {
     const display = document.getElementById("api-key-display");
     if (!display) return;
@@ -999,11 +801,6 @@ export class AppController {
     this._syncApiKeyControls(key);
   }
 
-  /**
-   * Enable/disable API key action buttons and sync labels
-   * @private
-   * @param {string} key
-   */
   _syncApiKeyControls(key) {
     const hasKey = Boolean(key);
     const visibilityBtn = document.getElementById("api-key-visibility");
@@ -1022,12 +819,6 @@ export class AppController {
     }
   }
 
-  /**
-   * Copy API key to clipboard
-   * @private
-   * @param {string} key
-   * @returns {Promise<boolean>}
-   */
   async _copyApiKey(key) {
     if (!key) return false;
 
@@ -1071,10 +862,6 @@ export class AppController {
     }
   }
 
-  /**
-   * Mark API key display as invalid (visual feedback)
-   * @private
-   */
   _markApiKeyAsInvalid() {
     const displayInput = document.getElementById("api-key-display");
     if (displayInput) {
@@ -1082,10 +869,6 @@ export class AppController {
     }
   }
 
-  /**
-   * Clear invalid state from API key display
-   * @private
-   */
   _clearApiKeyInvalidState() {
     const displayInput = document.getElementById("api-key-display");
     if (displayInput) {
@@ -1093,10 +876,6 @@ export class AppController {
     }
   }
 
-  /**
-   * Get transport status
-   * @returns {Object}
-   */
   getStatus() {
     return {
       mode: this.state.getMode(),
@@ -1105,21 +884,12 @@ export class AppController {
     };
   }
 
-  /**
-   * Provide a resolver for assets per mode (external source e.g. custom tickers)
-   * @param {(mode: 'simulation' | 'real') => Array} resolver
-   */
   setAssetsResolver(resolver) {
     if (typeof resolver === "function") {
       this.assetsResolver = resolver;
     }
   }
 
-  /**
-   * Refresh assets for current mode using resolver or provided array
-   * @param {Array} [nextAssets]
-   * @param {Object} [options]
-   */
   applyExternalAssets(nextAssets, options = {}) {
     const mode = options.mode || this.state.getMode();
     const resolvedAssets = Array.isArray(nextAssets)
@@ -1143,7 +913,6 @@ export class AppController {
       });
     }
 
-    // Update references and reconcile state without clearing existing real-data tiles
     this.assets = resolvedAssets;
     this.simulation.assets = resolvedAssets;
     this.state.reconcileTiles(resolvedAssets, {
@@ -1151,14 +920,11 @@ export class AppController {
       mode,
     });
 
-    // Keep sparkline history aligned with the new asset list
     this._reconcilePriceHistory(resolvedAssets, mode);
 
-    // Update views/DOM
     if (this.modalView) this.modalView.updateAssets(resolvedAssets);
     if (this.heatmapView) this.heatmapView.updateAssets(resolvedAssets);
 
-    // Refresh registry + renderer cache for the rebuilt DOM
     this.tileRegistry.setAssets(resolvedAssets);
     this.tileRegistry.initializeDOMCache();
     this._syncRendererWithRegistry();
@@ -1187,13 +953,11 @@ export class AppController {
           this.transport.ws.subscribe(addedTickers);
           log.info(`Subscribed to ${addedTickers.length} new ticker(s): ${addedTickers.join(", ")}`);
 
-          // Warm up new tickers via REST without clearing existing progress
           this.transport.warmupTickers(addedTickers).catch((error) => {
             log.warn("Warmup fetch failed:", error?.message || error);
           });
         }
 
-        // Unsubscribe from removed tickers
         if (removedTickers.length > 0 && this.transport.ws) {
           this.transport.ws.unsubscribe(removedTickers);
           log.info(`Unsubscribed from ${removedTickers.length} ticker(s): ${removedTickers.join(", ")}`);
@@ -1214,10 +978,6 @@ export class AppController {
     }
   }
 
-  /**
-   * Resolve base assets for a mode
-   * @private
-   */
   _resolveAssetsForMode(mode) {
     if (typeof this.assetsResolver === "function") {
       return this.assetsResolver(mode);
@@ -1225,30 +985,14 @@ export class AppController {
     return mode === "simulation" ? SIMULATION_ASSETS : REAL_DATA_ASSETS;
   }
 
-  /**
-   * Search tickers using the transport's REST client
-   * @param {string} query
-   * @param {Object} [options]
-   * @returns {Promise<Array>}
-   */
   async searchSymbols(query, options = {}) {
     return this.transport.searchSymbols(query, options);
   }
 
-  /**
-   * External hook for toasts
-   * @param {string} message
-   * @param {number} duration
-   */
   notify(message, duration) {
     this._showToast(message, duration);
   }
 
-  /**
-   * Fetch a single quote immediately (used for manual ticker additions)
-   * @param {string} ticker
-   * @returns {Promise<Object|null>}
-   */
   async fetchQuoteDirect(ticker) {
     return this.transport.fetchQuoteDirect(ticker);
   }

@@ -1,8 +1,3 @@
-/**
- * Main Entry Point
- * Initializes the application and maintains backward compatibility with existing UI code
- */
-
 import { AppController } from "../services/AppController.js";
 import { CONFIG, SIMULATION_ASSETS, REAL_DATA_ASSETS, MAX_TOTAL_TICKERS } from "../config.js";
 import { logger } from "../utils/Logger.js";
@@ -35,12 +30,7 @@ if (typeof window !== "undefined") {
   }
 }
 
-// Set log level from config
 logger.setLevel(CONFIG.LOG_LEVEL);
-
-// ============================================================================
-// Asset Data
-// ============================================================================
 
 const CUSTOM_ASSET_STORAGE_KEY = "heatmap_custom_assets_v1";
 const BLACKLIST_STORAGE_KEY = "heatmap_blacklist_tickers_v1";
@@ -75,7 +65,6 @@ function loadCustomAssetMetadata() {
 let customAssetMetadata = loadCustomAssetMetadata();
 let tickerBlacklist = loadBlacklist();
 
-// Blacklist management for removed tickers
 function loadBlacklist() {
   if (typeof window === "undefined") return [];
   try {
@@ -236,7 +225,6 @@ function syncAssetsSnapshot(mode) {
   return computed;
 }
 
-// Start with simulation assets as default
 let assets = composeAssetsForMode("simulation");
 
 const priceFormatter = new Intl.NumberFormat("en-US", {
@@ -473,7 +461,6 @@ async function performTickerLookup(query) {
     }
     console.error("Ticker lookup failed", error);
 
-    // Fallback: allow manual entry even if Finnhub search is unavailable
     const manualResult = {
       symbol: normalizedQuery.toUpperCase(),
       description: "Manual entry (not validated)",
@@ -561,7 +548,6 @@ function handleAddTickerSelection(symbol) {
     return;
   }
 
-  // Check if we've reached the maximum ticker limit
   const currentAssets = app?.assets || assets || [];
   if (currentAssets.length >= MAX_TOTAL_TICKERS) {
     showToast(`Maximum ${MAX_TOTAL_TICKERS} tickers allowed. Remove a ticker to add a new one.`);
@@ -588,9 +574,6 @@ function handleAddTickerSelection(symbol) {
   });
   controlPanelView?.scheduleStatsUpdate();
 
-  // Don't fetch immediately in real mode - let the normal WebSocket/REST flow handle it
-  // This avoids rate limiting issues and respects the sequential fetch queue
-
   renderTickerSearchResults(Array.from(lastTickerResults.values()), lastTickerQuery);
 }
 
@@ -603,13 +586,11 @@ function removeTicker(ticker) {
     return;
   }
 
-  // Add to blacklist to hide default tickers too
   if (!tickerBlacklist.includes(normalized)) {
     tickerBlacklist.push(normalized);
     saveBlacklist(tickerBlacklist);
   }
 
-  // If it's a custom ticker, also remove from custom metadata
   if (isCustomTicker(normalized)) {
     customAssetMetadata = customAssetMetadata.filter((item) => item.ticker !== normalized);
     persistCustomAssets();
@@ -624,18 +605,10 @@ function removeTicker(ticker) {
   controlPanelView?.scheduleStatsUpdate();
 }
 
-// ============================================================================
-// Global App Instance
-// ============================================================================
-
 let app = null;
 let controlPanelView = null;
 let heatmapView = null;
 let modalView = null;
-
-// ============================================================================
-// Initialization
-// ============================================================================
 
 function initHeatmap() {
   log.info("Initializing heatmap...");
@@ -669,7 +642,6 @@ function initHeatmap() {
   modalView.setApp(app);
   heatmapView.setApp(app);
 
-  // Pass view references to AppController for dynamic asset switching
   app.setViews({ heatmapView, modalView });
 
   const controlHelpers = {
@@ -689,7 +661,6 @@ function initHeatmap() {
   controlPanelView.updateStats();
   controlPanelView.setAssets(getRuntimeAssets());
 
-  // Handle single tile updates (Real Data mode)
   app.state.on("tile:updated", (payload = {}) => {
     controlPanelView.scheduleStatsUpdate();
     modalView.updateModalIfOpen();
@@ -698,7 +669,6 @@ function initHeatmap() {
     }
   });
 
-  // Handle batch tile updates (Simulation mode - optimized)
   app.state.on("tiles:batch_updated", () => {
     controlPanelView.scheduleStatsUpdate();
     modalView.updateModalIfOpen();
@@ -712,12 +682,7 @@ function initHeatmap() {
   showToast("Heatmap loaded");
 }
 
-// ============================================================================
-// UI Features (from original script)
-// ============================================================================
-
 function setupFiltersAndSearch() {
-  // handled by ControlPanelView
 }
 
 function applyFilters() {
@@ -736,20 +701,13 @@ function updateStats() {
 }
 
 function setupSliders() {
-  // handled by ControlPanelView
 }
 function setupThemes() {
-  // handled by ControlPanelView
 }
 function setupButtons() {
-  // handled by ControlPanelView
 }
 function setupKeyboardShortcuts() {
-  // handled by ControlPanelView
 }
-// ============================================================================
-// Modal Functions
-// ============================================================================
 
 function showAssetDetails(index) {
   modalView?.showAssetDetails(index);
@@ -762,9 +720,6 @@ function closeModal() {
 function updateModalIfOpen() {
   modalView?.updateModalIfOpen();
 }
-// ============================================================================
-// Control Functions
-// ============================================================================
 
 function getRuntimeAssets() {
   return app?.assets || assets;
@@ -793,7 +748,6 @@ function simulateMarketCrash() {
   getRuntimeAssets().forEach((asset) => {
     const tile = app.state.getTile(asset.ticker);
     if (tile) {
-      // Ensure we have a base price (use placeholder for simulation)
       const basePrice = tile.basePrice || tile._placeholderBasePrice;
       tile.basePrice = basePrice;
 
@@ -810,7 +764,6 @@ function simulateBullRun() {
   getRuntimeAssets().forEach((asset) => {
     const tile = app.state.getTile(asset.ticker);
     if (tile) {
-      // Ensure we have a base price (use placeholder for simulation)
       const basePrice = tile.basePrice || tile._placeholderBasePrice;
       tile.basePrice = basePrice;
 
@@ -827,7 +780,6 @@ function resetMarket() {
   getRuntimeAssets().forEach((asset) => {
     const tile = app.state.getTile(asset.ticker);
     if (tile) {
-      // Ensure we have a base price (use placeholder for simulation)
       const basePrice = tile.basePrice || tile._placeholderBasePrice;
       tile.basePrice = basePrice;
 
@@ -864,7 +816,6 @@ function exportToCSV() {
   showToast("Data exported successfully");
 }
 
-// Theme cycling
 const THEMES = ["thermal", "matrix", "ocean", "sunset", "monochrome"];
 const THEME_NAMES = {
   thermal: "Thermal",
@@ -876,7 +827,6 @@ const THEME_NAMES = {
 
 let currentTheme = localStorage.getItem("heatmap-theme") || "thermal";
 
-// Apply saved theme on load
 document.body.setAttribute("data-theme", currentTheme);
 document.documentElement.setAttribute("data-theme", currentTheme);
 
@@ -885,11 +835,9 @@ function cycleTheme() {
   const nextIndex = (currentIndex + 1) % THEMES.length;
   currentTheme = THEMES[nextIndex];
 
-  // Apply theme
   document.body.setAttribute("data-theme", currentTheme);
   document.documentElement.setAttribute("data-theme", currentTheme);
 
-  // Save preference
   try {
     localStorage.setItem("heatmap-theme", currentTheme);
   } catch (e) {
@@ -898,10 +846,6 @@ function cycleTheme() {
 
   showToast(`Theme: ${THEME_NAMES[currentTheme]}`);
 }
-
-// ============================================================================
-// Utility Functions
-// ============================================================================
 
 function showToast(message, duration = 6500) {
   const toast = document.getElementById("toast");
@@ -923,31 +867,23 @@ function debounce(func, wait) {
   };
 }
 
-// ============================================================================
-// Initialization on DOM Ready
-// ============================================================================
-
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", initHeatmap);
 } else {
   initHeatmap();
 }
 
-// Cleanup on page unload
 window.addEventListener("beforeunload", () => {
   if (app) {
     app.transport.stop();
   }
 });
 
-// Pause when tab hidden
 document.addEventListener("visibilitychange", () => {
   if (!app) return;
 
   if (document.hidden) {
-    // Tab hidden - could pause updates here if needed
   } else {
-    // Tab visible again
     updateStats();
   }
 });

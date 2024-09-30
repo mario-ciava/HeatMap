@@ -16,7 +16,7 @@ describe("UpdateScheduler", () => {
     const scheduler = createScheduler(batches);
 
     scheduler.request("AAA", 0);
-    scheduler.request("AAA", 1); // Should overwrite index
+    scheduler.request("AAA", 1);
     scheduler.request("BBB", 2);
 
     expect(batches.length).toBe(0);

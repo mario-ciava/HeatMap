@@ -1,7 +1,5 @@
 @layer components {
-/* Control Panel - Premium Designer Style */
 .control-panel {
-  /* background: var(--panel-card-bg); */
   background:
     linear-gradient(
       90deg,
@@ -71,7 +69,6 @@
     0 0 0 1px var(--accent-glow-medium) inset;
 }
 
-/* Fallback for browsers without backdrop-filter support */
 @supports not (backdrop-filter: blur(8px)) {
   .control-panel {
     background: rgba(15, 23, 42, 0.9);
@@ -145,7 +142,6 @@
   gap: 8px;
 }
 
-/* Fetching state */
 .status-indicator.fetching {
   color: #fbbf24;
   background: rgba(251, 191, 36, 0.12);
@@ -158,7 +154,6 @@
   animation: fetchingPulse var(--motion-fetchingPulse) !important;
 }
 
-/* Paused state */
 .status-indicator.paused {
   color: #f59e0b;
   background: rgba(245, 158, 11, 0.12);
@@ -522,7 +517,6 @@
   z-index: 100001;
 }
 
-/* Ensure dropdown stays aligned within filters row */
 .control-section.filters-row .select-dropdown {
   top: calc(100% + 10px);
   bottom: auto;
@@ -903,7 +897,6 @@ input[type="range"]::-moz-range-progress {
   box-shadow: none;
 }
 
-/* Responsive */
 @media (max-width: 1024px) {
   .control-section.sliders {
     grid-template-columns: 1fr;
@@ -925,14 +918,12 @@ input[type="range"]::-moz-range-progress {
   }
 }
 
-/* Data feed toggle */
 .mode-switch {
   display: flex;
   align-items: center;
   gap: 12px;
 }
 
-/* Pause fetch button */
 .pause-fetch-btn {
   display: inline-flex;
   align-items: center;
@@ -970,7 +961,6 @@ input[type="range"]::-moz-range-progress {
   transition: all 0.3s ease;
 }
 
-/* Pause icon (two vertical bars) */
 .pause-fetch-btn .pause-icon::before,
 .pause-fetch-btn .pause-icon::after {
   content: "";
@@ -997,7 +987,6 @@ input[type="range"]::-moz-range-progress {
   background: var(--accent-tertiary);
 }
 
-/* Play icon (triangle) when paused */
 .pause-fetch-btn.paused .pause-icon::before {
   width: 0;
   height: 0;
@@ -1102,7 +1091,6 @@ input[type="range"]::-moz-range-progress {
   transition: color 0.3s ease;
 }
 
-/* API key management */
 .real-only {
   max-height: 0;
   opacity: 0;
@@ -1480,7 +1468,6 @@ input[type="range"]::-moz-range-progress {
   }
 }
 
-/* Accessibility: Consistent focus-visible for control panel elements */
 .select-trigger:focus-visible,
 .api-action-btn:focus-visible,
 .slider-control:focus-visible {

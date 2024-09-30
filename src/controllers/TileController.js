@@ -119,16 +119,11 @@ export class TileController {
     this.scheduler.request(ticker, cacheIndex);
   }
 
-  /**
-   * Handle batch tile updates (optimization for simulation mode)
-   * @param {Object} payload - { tickers: Array<{ticker, index}>, count: number }
-   */
   handleTilesBatchUpdated({ tickers }) {
     if (!tickers || !Array.isArray(tickers)) return;
 
     const perfId = perfStart("handleTilesBatch");
 
-    // Process all updates in batch
     tickers.forEach(({ ticker, index }) => {
       if (!ticker) return;
 

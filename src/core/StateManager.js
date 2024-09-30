@@ -1,50 +1,22 @@
-/**
- * StateManager - Centralized reactive state store
- * Single source of truth for all tile states
- */
-
 import { EventEmitter } from './EventEmitter.js';
-
-/**
- * @typedef {Object} TileState
- * @property {string} ticker - Stock ticker symbol
- * @property {number} [price] - Current price
- * @property {number} [basePrice] - Base price for % calculation
- * @property {number} [change] - Percentage change
- * @property {boolean} hasInfo - Whether we've received at least one data point
- * @property {number} [lastTradeTs] - Timestamp of last trade received (for staleness check)
- * @property {string} name - Company name
- * @property {string} sector - Business sector
- */
-
-/**
- * @typedef {Object} AppState
- * @property {'simulation' | 'real'} mode - Current operating mode
- * @property {Map<string, TileState>} tiles - Map of ticker → state
- * @property {Map<string, boolean>} marketStatus - Map of exchange → isOpen
- */
 
 export class StateManager extends EventEmitter {
   constructor(initialAssets = []) {
     super();
     
-    /** @type {AppState} */
     this.state = {
       mode: 'simulation',
       tiles: new Map(),
       marketStatus: new Map()
     };
 
-    // Initialize tiles from assets array
     initialAssets.forEach(asset => {
       this.state.tiles.set(asset.ticker, {
         ticker: asset.ticker,
         name: asset.name,
         sector: asset.sector,
-        // Store placeholder values for simulation mode reference
         _placeholderPrice: asset.price,
         _placeholderBasePrice: asset.basePrice,
-        // Actual values start as null/undefined in real mode
         price: null,
         basePrice: null,
         change: null,
@@ -53,22 +25,16 @@ export class StateManager extends EventEmitter {
         high: null,
         low: null,
         volume: null,
-        hasInfo: false, // Start with NO INFO
+        hasInfo: false,
         lastTradeTs: 0,
         dirty: true
       });
     });
   }
 
-  /**
-   * Reinitialize tiles with a new set of assets
-   * @param {Array} assets - New assets array
-   */
   reinitializeTiles(assets) {
-    // Clear existing tiles
     this.state.tiles.clear();
 
-    // Initialize new tiles from assets array
     assets.forEach(asset => {
       this.state.tiles.set(asset.ticker, {
         ticker: asset.ticker,
@@ -93,13 +59,6 @@ export class StateManager extends EventEmitter {
     this.emit('tiles:reinitialized', { count: assets.length });
   }
 
-  /**
-   * Reconcile tiles with a new asset list without discarding existing data
-   * @param {Array} assets
-   * @param {Object} options
-   * @param {boolean} [options.preserveExistingData=false] - Keep existing quote data for overlapping tickers
-   * @param {'simulation' | 'real'} [options.mode] - Mode to initialize placeholders for new tickers
-   */
   reconcileTiles(assets, options = {}) {
     const { preserveExistingData = false, mode } = options;
     const targetMode = mode || this.state.mode || 'simulation';
@@ -161,18 +120,10 @@ export class StateManager extends EventEmitter {
     this.emit('tiles:reinitialized', { count: this.state.tiles.size });
   }
 
-  /**
-   * Get current mode
-   * @returns {'simulation' | 'real'}
-   */
   getMode() {
     return this.state.mode;
   }
 
-  /**
-   * Set operating mode
-   * @param {'simulation' | 'real'} mode
-   */
   setMode(mode) {
     const oldMode = this.state.mode;
     this.state.mode = mode;
@@ -182,32 +133,14 @@ export class StateManager extends EventEmitter {
     }
   }
 
-  /**
-   * Get state for a specific ticker
-   * @param {string} ticker
-   * @returns {TileState | undefined}
-   */
   getTile(ticker) {
     return this.state.tiles.get(ticker);
   }
 
-  /**
-   * Get all tiles
-   * @returns {Map<string, TileState>}
-   */
   getAllTiles() {
     return this.state.tiles;
   }
 
-  /**
-   * Update tile with new quote data
-   * @param {string} ticker
-   * @param {Object} quoteData
-   * @param {number} quoteData.price - Current price
-   * @param {number} [quoteData.previousClose] - Previous close price
-   * @param {number} [quoteData.changePercent] - Pre-calculated change %
-   * @param {number} [quoteData.timestamp] - Trade timestamp
-   */
   updateTile(ticker, quoteData) {
     const tile = this.state.tiles.get(ticker);
     if (!tile) {
@@ -218,7 +151,6 @@ export class StateManager extends EventEmitter {
     const oldPrice = tile.price;
     const newPrice = quoteData.price;
 
-    // Update base price if provided
     if (quoteData.previousClose != null && quoteData.previousClose > 0) {
       tile.basePrice = quoteData.previousClose;
       tile.previousClose = quoteData.previousClose;
@@ -236,7 +168,6 @@ export class StateManager extends EventEmitter {
       tile.low = quoteData.low;
     }
 
-    // Update price
     tile.price = newPrice;
 
     if (tile.open == null) {
@@ -251,17 +182,14 @@ export class StateManager extends EventEmitter {
       tile.low = newPrice;
     }
 
-    // Update change percentage
     if (quoteData.changePercent != null) {
       tile.change = quoteData.changePercent;
     } else if (tile.basePrice != null && tile.basePrice > 0) {
-      // Calculate from basePrice if not provided
       tile.change = ((newPrice - tile.basePrice) / tile.basePrice) * 100;
     } else {
       tile.change = null;
     }
 
-    // Mark as having info now
     tile.hasInfo = true;
     tile.lastTradeTs = quoteData.timestamp || Date.now();
     tile.dirty = true;
@@ -270,19 +198,14 @@ export class StateManager extends EventEmitter {
       tile.volume = (tile.volume || 0) + quoteData.volume;
     }
 
-    // Emit change event
     this.emit('tile:updated', {
       ticker,
       oldPrice,
       newPrice,
-      tile: { ...tile } // Shallow copy for immutability
+      tile: { ...tile }
     });
   }
 
-  /**
-   * Reset tile to NO INFO state (for mode switching)
-   * @param {string} ticker
-   */
   resetTileInfo(ticker) {
     const tile = this.state.tiles.get(ticker);
     if (!tile) return;
@@ -294,18 +217,11 @@ export class StateManager extends EventEmitter {
     this.emit('tile:reset', { ticker });
   }
 
-  /**
-   * Reset all tiles to NO INFO state
-   * In real mode: clears all data (null) - but preserves cached real data
-   * In simulation mode: restores placeholder values
-   * @param {boolean} preserveRealData - If true, keeps previously fetched real data
-   */
   resetAllTiles(preserveRealData = false) {
     const isSimulation = this.state.mode === 'simulation';
 
     this.state.tiles.forEach((tile, ticker) => {
       if (isSimulation) {
-        // Save current real data if it exists
         if (tile.hasInfo && tile.price != null) {
           tile._savedRealPrice = tile.price;
           tile._savedRealBasePrice = tile.basePrice;
@@ -318,7 +234,6 @@ export class StateManager extends EventEmitter {
           tile._savedRealVolume = tile.volume;
         }
 
-        // Restore placeholder values for simulation
         tile.price = tile._placeholderPrice;
         tile.basePrice = tile._placeholderBasePrice;
         tile.change = 0;
@@ -331,7 +246,6 @@ export class StateManager extends EventEmitter {
         tile.lastTradeTs = 0;
         tile.dirty = true;
       } else {
-        // Real mode: restore previously saved data if available and requested
         if (preserveRealData && tile._savedRealPrice != null) {
           tile.price = tile._savedRealPrice;
           tile.basePrice = tile._savedRealBasePrice;
@@ -345,7 +259,6 @@ export class StateManager extends EventEmitter {
           tile.hasInfo = true;
           tile.dirty = true;
         } else {
-          // Clear data for real mode (waiting for API)
           tile.price = null;
           tile.basePrice = null;
           tile.change = null;
@@ -364,11 +277,6 @@ export class StateManager extends EventEmitter {
     this.emit('tiles:reset', {});
   }
 
-  /**
-   * Update market status for an exchange
-   * @param {string} exchange - Exchange code (e.g., 'US', 'L', 'GER')
-   * @param {boolean} isOpen - Whether the market is open
-   */
   setMarketStatus(exchange, isOpen) {
     const oldStatus = this.state.marketStatus.get(exchange);
     this.state.marketStatus.set(exchange, isOpen);
@@ -378,23 +286,12 @@ export class StateManager extends EventEmitter {
     }
   }
 
-  /**
-   * Get market status for an exchange
-   * @param {string} exchange
-   * @returns {boolean | null} null if unknown
-   */
   getMarketStatus(exchange) {
     return this.state.marketStatus.has(exchange) 
       ? this.state.marketStatus.get(exchange) 
       : null;
   }
 
-  /**
-   * Check if a ticker's last trade is stale (for heuristic market status)
-   * @param {string} ticker
-   * @param {number} [staleThresholdMs=300000] - Default 5 minutes
-   * @returns {boolean}
-   */
   isTradeStale(ticker, staleThresholdMs = 300000) {
     const tile = this.state.tiles.get(ticker);
     if (!tile || !tile.lastTradeTs) return true;
@@ -402,10 +299,6 @@ export class StateManager extends EventEmitter {
     return (Date.now() - tile.lastTradeTs) > staleThresholdMs;
   }
 
-  /**
-   * Get serializable state snapshot (for persistence)
-   * @returns {Object}
-   */
   serialize() {
     return {
       mode: this.state.mode,
@@ -426,10 +319,6 @@ export class StateManager extends EventEmitter {
     };
   }
 
-  /**
-   * Restore state from serialized snapshot
-   * @param {Object} snapshot
-   */
   deserialize(snapshot) {
     if (!snapshot || !Array.isArray(snapshot.tiles)) return;
 

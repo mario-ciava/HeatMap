@@ -99,7 +99,6 @@ export class TileRenderer {
             cached.change.textContent = changeText;
             cached.lastChangeText = changeText;
           }
-          // Apply positive/negative classes for arrow display
           if (changeValue > 0) {
             cached.change.classList.remove("negative");
             cached.change.classList.add("positive");
@@ -152,7 +151,6 @@ export class TileRenderer {
     const perfId = perfStart("updateTileClasses");
     const current = element.dataset.state || "neutral";
 
-    // CRITICAL: Don't touch classes if state hasn't changed - preserves CSS animations!
     if (current === nextState) {
       perfEnd(perfId);
       return;

@@ -1,8 +1,3 @@
-/**
- * Logger - Production-ready logging utility
- * Clean, minimal, configurable
- */
-
 const LOG_LEVELS = {
   debug: 0,
   info: 1,
@@ -89,7 +84,6 @@ class Logger {
   }
 }
 
-// Export singleton - default to warn level in production
 export const logger = new Logger({
   level: 'warn',
   enableTimestamp: true,

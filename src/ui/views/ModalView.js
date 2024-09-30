@@ -12,12 +12,8 @@ export class ModalView {
     this.app = app;
   }
 
-  /**
-   * Update assets list
-   */
   updateAssets(newAssets) {
     this.assets = newAssets;
-    // Close modal if currently open asset is out of range
     if (this.currentModalAssetIndex !== null && this.currentModalAssetIndex >= newAssets.length) {
       this.closeModal();
     }
@@ -31,7 +27,6 @@ export class ModalView {
           this.closeModal();
         }
 
-        // Handle remove button clicks (for dynamically added button)
         if (event.target.id === "modal-remove-btn-inline") {
           this.handleRemoveTicker();
         }
@@ -63,7 +58,6 @@ export class ModalView {
     const history = this.app.priceHistory.get(asset.ticker) || [];
     const mode = this.app.state.getMode();
 
-    // Update modal header with ticker and company name
     const modalTicker = document.getElementById("modal-ticker");
     const modalName = document.getElementById("modal-name");
     if (modalTicker) {
@@ -161,7 +155,6 @@ export class ModalView {
     addRow("Volume", this.helpers.formatVolume(volumeValue));
     addRow("Last Trade", lastTradeLabel);
 
-    // Remove button (always visible, handler will check if removal is allowed)
     const removeButtonHtml = `
       <div style="grid-column: 1 / -1; margin-bottom: 16px; display: flex; justify-content: flex-start;">
         <button class="modal-remove-btn" id="modal-remove-btn-inline" type="button" data-ticker="${asset.ticker}">

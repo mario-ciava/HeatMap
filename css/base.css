@@ -49,7 +49,6 @@ body::before {
   animation: ambientGlow var(--motion-ambientGlow);
 }
 
-/* Footer */
 .page-footer {
   width: 100%;
   max-width: 1400px;
@@ -71,7 +70,6 @@ body::before {
   letter-spacing: 0.3px;
 }
 
-/* Scrollbar styles for page */
 ::-webkit-scrollbar {
   width: 10px;
 }
@@ -81,7 +79,6 @@ body::before {
   border-radius: 10px;
 }
 
-/* Default theme (fire) */
 ::-webkit-scrollbar-thumb {
   background: rgba(251, 146, 60, 0.35);
   border-radius: 10px;

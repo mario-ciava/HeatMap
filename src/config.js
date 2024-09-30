@@ -1,8 +1,3 @@
-/**
- * Central Configuration
- * All app-wide constants and settings
- */
-
 function computeDefaultProxyBase() {
   if (typeof window !== "undefined" && window.location?.origin) {
     return `${window.location.origin.replace(/\/$/, "")}/proxy`;
@@ -24,44 +19,34 @@ const DEFAULT_PROXY_BASE =
     || computeDefaultProxyBase();
 
 export const CONFIG = {
-  // === Security & Proxy Settings ===
   SECURITY: {
-    // Force proxy mode: API key is always managed server-side (secure)
-    // Set to false only if you want to test direct API calls in development
-    PROXY_MODE: true, // true = always use proxy (recommended)
-    FORCE_PROXY_MODE: false, // Deprecated (use PROXY_MODE: true instead)
-    // Base URL for the VPS proxy (can be overridden via VITE_PROXY_URL env var)
-    PROXY_BASE: DEFAULT_PROXY_BASE
+    PROXY_MODE: true,
+    FORCE_PROXY_MODE: false,
+    PROXY_BASE: DEFAULT_PROXY_BASE,
   },
 
-  // === Finnhub API Settings ===
   FINNHUB: {
-    // When PROXY_MODE is true, these will point to your Worker
     WS_URL: 'wss://ws.finnhub.io',
     REST_BASE: 'https://finnhub.io/api/v1',
     
-    // Reconnect strategy for WebSocket
     RECONNECT: {
-      INITIAL_DELAY: 1000,      // Start with 1s
-      MAX_DELAY: 30000,         // Cap at 30s
-      BACKOFF_MULTIPLIER: 2,    // Double each time
-      MAX_RETRIES: 10           // Max 10 retries before giving up
+      INITIAL_DELAY: 1000,
+      MAX_DELAY: 30000,
+      BACKOFF_MULTIPLIER: 2,
+      MAX_RETRIES: 10,
     },
     
-    // Rate limiting for REST endpoints
     RATE_LIMIT: {
-      MAX_CALLS_PER_MINUTE: 60, // Free tier limit
-      BACKOFF_429: 60000,       // Wait 60s after 429
-      MARKET_STATUS_INTERVAL: 60000, // Check every 60s
+      MAX_CALLS_PER_MINUTE: 60,
+      BACKOFF_429: 60000,
+      MARKET_STATUS_INTERVAL: 60000,
     },
     
-    // Market status heuristic fallback
-    TRADE_STALENESS_MS: 300000, // 5 minutes
+    TRADE_STALENESS_MS: 300000,
   },
   
-  // === UI Update Settings ===
   UI: {
-    UPDATE_FREQUENCY: 1000,     // Simulation mode update rate
+    UPDATE_FREQUENCY: 1000,
     THRESHOLDS: {
       STRONG_GAIN: 3,
       MILD_GAIN: 0.5,
@@ -76,33 +61,20 @@ export const CONFIG = {
     }
   },
   
-  // === API Key Settings ===
   API_KEY: {
-    // API key is managed server-side by the VPS proxy (secure)
-    // No sensitive data stored in frontend code
-    LOCAL_DEV_KEY: '', // Empty - proxy handles authentication
-    STORAGE_KEY: 'finnhub_api_key'  // localStorage key (not used in proxy mode)
+    LOCAL_DEV_KEY: '',
+    STORAGE_KEY: 'finnhub_api_key',
   },
 
-  // === Storage Keys ===
   STORAGE: {
     THEME: 'heatmap_theme',
     STATE: 'heatmap-state'
   },
   
-  // === Logging ===
-  LOG_LEVEL: 'info' // 'debug' | 'info' | 'warn' | 'error'
+  LOG_LEVEL: 'info'
 };
 
-/**
- * Ticker to Exchange Mapping
- * Maps each ticker to its primary exchange for market status checks
- * 
- * Exchanges: US, TO (Toronto), V (Venture), CN (Canadian), L (London), etc.
- * Default: US for unmapped tickers
- */
 export const TICKER_EXCHANGE_MAP = {
-  // US Stocks (default, but explicit for clarity)
   'AAPL': 'US',
   'MSFT': 'US',
   'GOOGL': 'US',
@@ -143,7 +115,7 @@ export const TICKER_EXCHANGE_MAP = {
   'VZ': 'US',
   'XOM': 'US',
   'CVX': 'US',
-  'SHEL': 'US', // Shell ADR traded on US exchanges
+  'SHEL': 'US',
   'AMD': 'US',
   'AVGO': 'US',
   'QCOM': 'US',
@@ -154,7 +126,6 @@ export const TICKER_EXCHANGE_MAP = {
   'BA': 'US',
   'GE': 'US',
 
-  // Additional simulation assets
   'SNOW': 'US',
   'DDOG': 'US',
   'NET': 'US',
@@ -206,22 +177,12 @@ export const TICKER_EXCHANGE_MAP = {
   'NEE': 'US',
   'COIN': 'US',
 
-  // Example: If you add European stocks in future:
-  // 'BMW.DE': 'GER',
-  // 'SAP.DE': 'GER',
-  // 'VOD.L': 'L',  // Vodafone on London
 };
 
-/**
- * Get exchange for a ticker (with US as fallback)
- */
 export function getExchangeForTicker(ticker) {
   return TICKER_EXCHANGE_MAP[ticker] || 'US';
 }
 
-/**
- * Get all unique exchanges currently in use
- */
 export function getActiveExchanges(tickers) {
   const exchanges = new Set();
   tickers.forEach(ticker => {
@@ -230,15 +191,6 @@ export function getActiveExchanges(tickers) {
   return Array.from(exchanges);
 }
 
-// ============================================================================
-// Asset Lists
-// ============================================================================
-
-/**
- * Real Data Assets - Used when in Real Data mode (30 assets)
- * These are well-established stocks with reliable real-time data
- * Maximum 40 tickers allowed (30 default + 10 custom)
- */
 export const REAL_DATA_ASSETS = [
   { ticker: "AAPL", name: "Apple Inc.", price: 182.52, basePrice: 182.52, change: 0, sector: "Technology" },
   { ticker: "MSFT", name: "Microsoft", price: 378.85, basePrice: 378.85, change: 0, sector: "Technology" },
@@ -274,15 +226,8 @@ export const REAL_DATA_ASSETS = [
 
 export const MAX_TOTAL_TICKERS = 40;
 
-/**
- * Simulation Assets - Used when in Simulation mode (80 assets)
- * Includes all 30 Real Data assets plus 50 additional assets for richer visualization
- */
 export const SIMULATION_ASSETS = [
-  // 30 default Real Data assets
   ...REAL_DATA_ASSETS,
-
-  // Additional 50 assets for simulation mode
   { ticker: "SNOW", name: "Snowflake", price: 145.32, basePrice: 145.32, change: 0, sector: "Technology" },
   { ticker: "DDOG", name: "Datadog", price: 89.45, basePrice: 89.45, change: 0, sector: "Technology" },
   { ticker: "NET", name: "Cloudflare", price: 62.18, basePrice: 62.18, change: 0, sector: "Technology" },
@@ -335,10 +280,6 @@ export const SIMULATION_ASSETS = [
   { ticker: "COIN", name: "Coinbase", price: 189.34, basePrice: 189.34, change: 0, sector: "Fintech" },
 ];
 
-/**
- * Detect if running on localhost/development environment
- * @returns {boolean}
- */
 export function isLocalDevelopment() {
   if (typeof window === 'undefined') return true;
 
@@ -351,28 +292,17 @@ export function isLocalDevelopment() {
     || hostname.endsWith('.local');
 }
 
-/**
- * Determine if proxy mode should be used
- * @returns {boolean}
- */
 export function shouldUseProxy() {
   const security = CONFIG.SECURITY;
 
-  // Explicit override
   if (security.PROXY_MODE === true) return true;
   if (security.PROXY_MODE === false) return false;
 
-  // Force proxy for testing locally
   if (security.FORCE_PROXY_MODE === true) return true;
 
-  // Auto-detect: use proxy only on production domains
   return !isLocalDevelopment();
 }
 
-/**
- * Get the appropriate API endpoints based on environment
- * @returns {Object} { wsUrl, restBase, useProxy, mode }
- */
 export function getApiEndpoints() {
   const useProxy = shouldUseProxy();
 

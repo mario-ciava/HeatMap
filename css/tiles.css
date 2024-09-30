@@ -1,5 +1,4 @@
 @layer components {
-/* Add Tile Styles - Minimal and Elegant */
 .add-tile {
   position: relative;
   aspect-ratio: 1;
@@ -104,7 +103,6 @@
   color: rgba(148, 163, 184, 0.9);
 }
 
-/* Heatmap layout */
 .heatmap-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
@@ -123,7 +121,6 @@
   contain-intrinsic-size: 800px;
 }
 
-/* Asset tiles */
 .asset-tile {
   position: relative;
   display: flex;
@@ -291,7 +288,6 @@
     saturate(var(--tile-neutral-saturation, 0.75));
 }
 
-/* Monochrome theme fine-tuning */
 body[data-theme="monochrome"] .asset-tile.neutral {
   --tile-color-1: #f6f7fb;
   --tile-color-2: #dfe3ea;
@@ -463,7 +459,6 @@ body[data-theme="monochrome"] .asset-tile.gaining-strong .price {
   }
 }
 
-/* Single tile mode - Enhanced display when only one tile is visible */
 .heatmap-grid.single-tile-mode {
   grid-template-columns: repeat(2, 1fr);
   max-width: 1200px;
@@ -523,7 +518,6 @@ body[data-theme="monochrome"] .asset-tile.gaining-strong .price {
   bottom: 80px;
 }
 
-/* Override container queries for single-tile-mode */
 @supports (container-type: inline-size) {
   @container asset-card (min-width: 180px) {
     .heatmap-grid.single-tile-mode .asset-tile:not(.hidden) .sparkline-canvas {

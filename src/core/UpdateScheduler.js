@@ -39,7 +39,6 @@ export class UpdateScheduler {
 
   flushImmediate() {
     if (!this.pending.size) {
-      // Ensure callers still receive a callback so they can drain expectations
       this.flushCallback([], true);
       this.frameScheduled = false;
       return;

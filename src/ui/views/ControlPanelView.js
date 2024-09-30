@@ -10,7 +10,7 @@ export class ControlPanelView {
     this.enhancedSelectWrappers = new Set();
     this.openCustomSelect = null;
     this.canvasResizeInProgress = false;
-    this.currentSingleTileMode = false; // Track current state
+    this.currentSingleTileMode = false;
     this._handlePointerDown = (event) => {
       if (this.openCustomSelect && !this.openCustomSelect.contains(event.target)) {
         this.openCustomSelect._close?.({ focusTrigger: false });
@@ -187,13 +187,11 @@ export class ControlPanelView {
         if (show) visibleCount++;
       });
 
-      // Apply special styling when only one tile is visible
       const container = document.getElementById("heatmap");
       if (container) {
         const isSingleTile = visibleCount === 1;
         container.classList.toggle("single-tile-mode", isSingleTile);
 
-        // Resize canvas only when state actually changes
         if (this.currentSingleTileMode !== isSingleTile) {
           this.currentSingleTileMode = isSingleTile;
           this.#resizeCanvasesForMode(isSingleTile);
@@ -288,7 +286,6 @@ export class ControlPanelView {
     const speedValue = document.getElementById("speed-value");
 
     if (speedSlider && speedValue) {
-      // Initialize slider with value from config
       speedSlider.value = CONFIG.UI.UPDATE_FREQUENCY;
       speedValue.textContent = `${CONFIG.UI.UPDATE_FREQUENCY}ms`;
 
@@ -359,7 +356,6 @@ export class ControlPanelView {
       isAnimating = true;
 
       if (!details.open) {
-        // Opening
         details.open = true;
         content.style.overflow = "hidden";
         content.style.opacity = "0";
@@ -384,7 +380,6 @@ export class ControlPanelView {
         };
         content.addEventListener("transitionend", onTransitionEnd, { once: true });
       } else {
-        // Closing
         const fullHeight = content.scrollHeight;
         content.style.height = `${fullHeight}px`;
         content.style.overflow = "hidden";
@@ -593,23 +588,15 @@ export class ControlPanelView {
   }
 
   #resizeCanvasesForMode(isSingleTile) {
-    // Prevent multiple simultaneous resize operations
     if (this.canvasResizeInProgress) return;
     this.canvasResizeInProgress = true;
 
-    // CSS handles the canvas dimensions via .single-tile-mode class
-    // TileRenderer reads clientWidth/clientHeight from CSS
-    // We just need to force re-render with new dimensions
-
     const canvases = document.querySelectorAll(".asset-tile:not(.hidden) .sparkline-canvas");
 
-    // Force context recreation and mark for redraw
     canvases.forEach((canvas) => {
-      // Remove inline styles to let CSS take over
       canvas.style.width = '';
       canvas.style.height = '';
 
-      // Delete cached context to force recreation with new dimensions
       delete canvas.__ctx;
 
       const tile = canvas.closest(".asset-tile");
@@ -621,17 +608,15 @@ export class ControlPanelView {
             const cached = this.app.tileRegistry.getCacheByTicker(asset.ticker);
             if (cached) {
               cached.needsSparklineUpdate = true;
-              cached.lastHistoryLength = 0; // Force sparkline redraw
+              cached.lastHistoryLength = 0;
             }
           }
         }
       }
     });
 
-    // Force reflow to apply new CSS dimensions
     canvases.forEach((canvas) => void canvas.offsetHeight);
 
-    // Re-render visible tiles with new dimensions from CSS
     requestAnimationFrame(() => {
       canvases.forEach((canvas) => {
         const tile = canvas.closest(".asset-tile");
